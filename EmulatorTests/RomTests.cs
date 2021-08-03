@@ -19,7 +19,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            emulator.Run(1);
+            emulator.Run(3);
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(0x0, register.BC);
             Assert.AreEqual(0x0, register.B);
