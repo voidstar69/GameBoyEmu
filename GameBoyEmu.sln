@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30517.126
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EmulatorTests", "EmulatorTests\EmulatorTests.csproj", "{D5EC5C89-F26E-4E93-B5B2-0347D67E8FBE}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "GameBoyEmu", "GameBoyEmu\GameBoyEmu.csproj", "{5547FD9E-355E-4B1D-AEDD-FE4EDC964780}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{D5EC5C89-F26E-4E93-B5B2-0347D67E8FBE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D5EC5C89-F26E-4E93-B5B2-0347D67E8FBE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D5EC5C89-F26E-4E93-B5B2-0347D67E8FBE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D5EC5C89-F26E-4E93-B5B2-0347D67E8FBE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5547FD9E-355E-4B1D-AEDD-FE4EDC964780}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5547FD9E-355E-4B1D-AEDD-FE4EDC964780}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5547FD9E-355E-4B1D-AEDD-FE4EDC964780}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5547FD9E-355E-4B1D-AEDD-FE4EDC964780}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {7B5A962D-6EE6-4668-8C4F-EAEAF63A2580}
+	EndGlobalSection
+EndGlobal

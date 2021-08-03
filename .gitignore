@@ -1,0 +1,7 @@
+/.vs
+/GameBoyEmu/obj
+/GameBoyEmu/bin
+/EmulatorTests/obj
+/EmulatorTests/bin
+/*.suo
+/*.user
