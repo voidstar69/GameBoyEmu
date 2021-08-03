@@ -9,6 +9,8 @@ namespace GameBoyEmu
         LD_BC_d16 = 0x01,
         LD_SP_d16 = 0x31,
         LD_A_d8 = 0x3e,
+        LD_HLmem_A = 0x77,  // LD (HL),A
+        LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf
     }
 
@@ -56,7 +58,7 @@ namespace GameBoyEmu
             }
         }
 
-        public byte GetRegister8(int index)
+        public byte Get8BitRegister(int index)
         {
             return index switch
             {
@@ -72,7 +74,7 @@ namespace GameBoyEmu
             };
         }
 
-        public void SetRegister8(int index, byte value)
+        public void Set8BitRegister(int index, byte value)
         {
             switch (index)
             {
@@ -105,6 +107,8 @@ namespace GameBoyEmu
 
             // Not bothered yet to add XOR A (opcode 0xAF) yet. Special cased this in the code
         };
+
+        public byte[] Memory => memory;
 
         private readonly byte[] memory = new byte[512];
 
@@ -163,8 +167,14 @@ namespace GameBoyEmu
                         if (opCode == 0x76)
                             throw new NotImplementedException("HALT");
 
-                        // TODO: register index 6 is a special case: read/write (HL) memory location
-                        reg.SetRegister8(destReg8Index, reg.GetRegister8(srcReg8Index));
+                        // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                        byte regOrMemVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
+
+                        if (destReg8Index == 6)
+                            memory[reg.HL] = regOrMemVal;
+                        else
+                            reg.Set8BitRegister(destReg8Index, regOrMemVal);
+
                         reg.PC += 1;
                         continue;
                     }
