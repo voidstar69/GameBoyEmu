@@ -1,8 +1,17 @@
 ﻿using System;
-using System.Collections.Generic;
 
 namespace GameBoyEmu
 {
+    public enum OpCode : byte
+    {
+        NOP = 0x00,
+        LD_HL_d16 = 0x21,
+        LD_BC_d16 = 0x01,
+        LD_SP_d16 = 0x31,
+        LD_A_d8 = 0x3e,
+        XOR_A = 0xaf
+    }
+
     public struct RegisterSet
     {
         public ushort PC;
@@ -94,7 +103,7 @@ namespace GameBoyEmu
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 2x
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 3x
 
-            // Not bothered to add XOR A (opcode 0xAF) yet. Special cased this in the code
+            // Not bothered yet to add XOR A (opcode 0xAF) yet. Special cased this in the code
         };
 
         private readonly byte[] memory = new byte[512];
@@ -106,15 +115,6 @@ namespace GameBoyEmu
 
         public Emulator()
         {
-            new List<int>();
-
-            //memory[0] = 0x00;
-            //memory[1] = 0x01;
-            //memory[2] = 0xab;
-            //memory[3] = 0xcd;
-
-            //reg.PC = 0;
-
             InjectRom(new byte[] { });
         }
 
@@ -139,9 +139,7 @@ namespace GameBoyEmu
                 byte nextNextByte = memory[reg.PC + 2];
                 ushort literal16Bit = (ushort)((nextNextByte << 8) + literal8Bit);
 
-                Console.WriteLine("Opcode: 0x{0:x}", opCode);
-                //Debug.WriteLine("Foobar: {0}", opCode);
-                //Trace.TraceInformation("Foobar: {0}", opCode);
+                Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
 
                 // Instruction decoder for middle block of Load and Artihmetic instructions (0x40 to 0xbf)
                 // TODO: check topOrBottomBlock and q2orQ4Block instead of opcode range
@@ -162,7 +160,7 @@ namespace GameBoyEmu
                         int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
 
                         // TODO: opcode 0x76 is a special case: HALT
-                        if(opCode == 0x76)
+                        if (opCode == 0x76)
                             throw new NotImplementedException("HALT");
 
                         // TODO: register index 6 is a special case: read/write (HL) memory location
@@ -173,7 +171,7 @@ namespace GameBoyEmu
                     else
                     {
                         // Arithmetic operation (for now XOR A is handled below)
-                        if(opCode != 0xAF)
+                        if (opCode != (byte)OpCode.XOR_A)
                             throw new NotImplementedException("Arithmetic operations");
                     }
                 }
@@ -182,31 +180,31 @@ namespace GameBoyEmu
                 switch (opCode)
                 {
                     // NOP
-                    case 0x00:
+                    case (byte)OpCode.NOP:
                         break;
 
                     // LD BC,d16
-                    case 0x01:
+                    case (byte)OpCode.LD_BC_d16:
                         reg.BC = literal16Bit;
                         break;
 
                     // LD SP,d16
-                    case 0x31:
+                    case (byte)OpCode.LD_SP_d16:
                         reg.SP = literal16Bit;
                         break;
 
                     // LD HL,d16
-                    case 0x21:
+                    case (byte)OpCode.LD_HL_d16:
                         reg.HL = literal16Bit;
                         break;
 
                     // LD A,d8
-                    case 0x3E:
+                    case (byte)OpCode.LD_A_d8:
                         reg.A = literal8Bit;
                         break;
 
                     // XOR A
-                    case 0xAF:
+                    case (byte)OpCode.XOR_A:
                         reg.A = (byte)(reg.A ^ reg.A);
                         reg.PC += 1;
                         continue;
