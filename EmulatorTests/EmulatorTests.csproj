@@ -18,4 +18,14 @@
     <ProjectReference Include="..\GameBoyEmu\GameBoyEmu.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Resource Include="DMG_ROM.bin" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="DMG_ROM.bin">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

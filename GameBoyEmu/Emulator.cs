@@ -1,10 +1,13 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace GameBoyEmu
 {
     public struct RegisterSet
     {
         public ushort PC;
+        public ushort SP;
+
         public byte B;
         public byte C;
 
@@ -21,13 +24,18 @@ namespace GameBoyEmu
 
     public class Emulator
     {
+        private const byte InvalidOpCode1 = 0xdd;
+
         private static readonly byte[] InstructionSize =
         {
-            // NOP | LD BC,d16 | LD (BC),A
-            1, 3, 1
+            // NOP | LD BC,d16 | LD (BC),A | ...
+            1,3,1,1,1,1,2,1,3,1,1,1,1,1,2,1, // 0x
+            2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 1x
+            2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 2x
+            2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 3x
         };
 
-        private readonly byte[] memory = new byte[100];
+        private readonly byte[] memory = new byte[512];
 
         // registers
         public RegisterSet Registers => reg;
@@ -38,10 +46,22 @@ namespace GameBoyEmu
         {
             memory[0] = 0x00;
             memory[1] = 0x01;
-            memory[2] = 0xAB;
-            memory[3] = 0xCD;
+            memory[2] = 0xab;
+            memory[3] = 0xcd;
 
             reg.PC = 0;
+
+            InjectRom(new byte[]{ });
+        }
+
+        public void InjectRom(byte[] romData)
+        {
+            //Array.Clear(memory, 0, memory.Length);
+
+            for(int i = romData.Length; i < memory.Length;i++)
+                memory[i] = InvalidOpCode1;
+
+            Array.Copy(romData, memory, romData.Length);
         }
 
         public void Run(int numInstructions = -1)
@@ -52,6 +72,11 @@ namespace GameBoyEmu
                 byte nextByte = memory[reg.PC + 1];
                 byte nextNextByte = memory[reg.PC + 2];
                 ushort nextShort = (ushort) ((nextByte << 8) + nextNextByte);
+
+                Console.WriteLine("Opcode: 0x{0:x}", opCode);
+                //Debug.WriteLine("Foobar: {0}", opCode);
+                //Trace.TraceInformation("Foobar: {0}", opCode);
+
                 switch (opCode)
                 {
                     // NOP
@@ -63,8 +88,16 @@ namespace GameBoyEmu
                         reg.BC = nextShort;
                         break;
 
+                    // LD SP,d16
+                    case 0x31:
+                        reg.SP = nextShort;
+                        break;
+
+                    case InvalidOpCode1:
+                        throw new ArgumentException("Invalid opcode: 0xdd");
+
                     default:
-                        throw new ArgumentOutOfRangeException();
+                        throw new ArgumentOutOfRangeException(nameof(opCode), opCode, null);
                 }
 
                 reg.PC += InstructionSize[opCode];
