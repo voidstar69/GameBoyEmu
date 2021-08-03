@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace GameBoyEmu
 {
@@ -7,10 +8,12 @@ namespace GameBoyEmu
         public ushort PC;
         public ushort SP;
 
+        // TODO: change these into 'file registers', an array of 8-bit registers?
         public byte A;
         public byte B;
         public byte C;
-
+        public byte D;
+        public byte E;
         public byte H;
         public byte L;
 
@@ -24,6 +27,16 @@ namespace GameBoyEmu
             }
         }
 
+        public ushort DE
+        {
+            get => (ushort)((D << 8) + E);
+            set
+            {
+                D = (byte)(value >> 8);
+                E = (byte)(value & 0xff);
+            }
+        }
+
         public ushort HL
         {
             get => (ushort)((H << 8) + L);
@@ -33,6 +46,40 @@ namespace GameBoyEmu
                 L = (byte)(value & 0xff);
             }
         }
+
+        public byte GetRegister8(int index)
+        {
+            return index switch
+            {
+                0 => B,
+                1 => C,
+                2 => D,
+                3 => E,
+                4 => H,
+                5 => L,
+                6 => throw new ArgumentOutOfRangeException(nameof(index), index, "(HL) is not an 8-bit register"),
+                7 => A,
+                _ => throw new ArgumentOutOfRangeException(nameof(index), index, "index of 8-bit register"),
+            };
+        }
+
+        public void SetRegister8(int index, byte value)
+        {
+            switch (index)
+            {
+                case 0: B = value; break;
+                case 1: C = value; break;
+                case 2: D = value; break;
+                case 3: E = value; break;
+                case 4: H = value; break;
+                case 5: L = value; break;
+                case 6: throw new ArgumentOutOfRangeException(nameof(index), index, "(HL) is not an 8-bit register");
+                case 7: A = value; break;
+                default: throw new ArgumentOutOfRangeException(nameof(index), index, "index of 8-bit register");
+            };
+        }
+
+        // TODO: Get/Set 16-bit registers
     }
 
     public class Emulator
@@ -59,6 +106,8 @@ namespace GameBoyEmu
 
         public Emulator()
         {
+            new List<int>();
+
             //memory[0] = 0x00;
             //memory[1] = 0x01;
             //memory[2] = 0xab;
@@ -94,6 +143,42 @@ namespace GameBoyEmu
                 //Debug.WriteLine("Foobar: {0}", opCode);
                 //Trace.TraceInformation("Foobar: {0}", opCode);
 
+                // Instruction decoder for middle block of Load and Artihmetic instructions (0x40 to 0xbf)
+                // TODO: check topOrBottomBlock and q2orQ4Block instead of opcode range
+                if (opCode >= 0x40 && opCode <= 0xbf)
+                {
+                    int topOrBottomBlock = (opCode >> 7) & 0x01; // 0 = Load. 1 = Arithmetic
+                    int q2orQ4Block = (opCode >> 6) & 0x01; // 1 = Load. 0 = Arithmetic. Must be opposite of topOrBottom
+                    if (q2orQ4Block == topOrBottomBlock)
+                        throw new InvalidOperationException("Should never occur!");
+
+                    int srcReg8Index = opCode & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
+
+                    if (topOrBottomBlock == 0)
+                    //if(opCode >= 0x40 && opCode <= 0x7f)
+                    {
+                        // 8-bit load operation (from register or memory, but not from 8-bit literal)
+
+                        int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
+
+                        // TODO: opcode 0x76 is a special case: HALT
+                        if(opCode == 0x76)
+                            throw new NotImplementedException("HALT");
+
+                        // TODO: register index 6 is a special case: read/write (HL) memory location
+                        reg.SetRegister8(destReg8Index, reg.GetRegister8(srcReg8Index));
+                        reg.PC += 1;
+                        continue;
+                    }
+                    else
+                    {
+                        // Arithmetic operation (for now XOR A is handled below)
+                        if(opCode != 0xAF)
+                            throw new NotImplementedException("Arithmetic operations");
+                    }
+                }
+
+                // General instructions, handled individually rather than decoded from opcode
                 switch (opCode)
                 {
                     // NOP

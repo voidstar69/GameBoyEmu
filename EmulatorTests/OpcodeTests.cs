@@ -75,6 +75,32 @@ namespace EmulatorTests
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(2, register.PC);
             Assert.AreEqual(0xbc, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.C);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.D);
+            Assert.AreEqual(0, register.E);
+            Assert.AreEqual(0, register.HL);
+            Assert.AreEqual(0, register.H);
+            Assert.AreEqual(0, register.L);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
+        public void Load_8bit_register_or_memory()
+        {
+            emulator.InjectRom(new byte[] { 0x3e, 0xbc, 0x57, 0x6a }); // LD A,d8 | LD D,A | LD L,D
+            emulator.Run(3);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0xbc, register.A);
+            Assert.AreEqual(0xbc, register.D);
+            Assert.AreEqual(0xbc, register.L);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.E);
+            Assert.AreEqual(0, register.H);
+            Assert.AreEqual(0, register.SP);
         }
 
         [Test]
