@@ -15,6 +15,10 @@ namespace GameBoyEmu
 
             Console.WriteLine();
             Console.WriteLine("Result in BC is 0x{0:x} and should be 0xabcd", emulator.Registers.BC);
+
+            //var emulator = new Emulator();
+            //emulator.InjectRom(new byte[] { (byte)OpCode.LD_A_HLmem });
+            //emulator.Run(1);
         }
     }
 }

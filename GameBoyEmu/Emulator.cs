@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 
 namespace GameBoyEmu
 {
@@ -186,32 +187,8 @@ namespace GameBoyEmu
                     bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
                     int opCodeRegIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q1
 
-                    // TODO: handle other opcode families
-                    switch (opCodeFamily)
-                    {
-                        // LD (reg16),A or LD A,(reg16) with mandatory post-increment or post-decrement if HL is the 16-bit register
-                        case 2:
-                            int reg16Index = opCodeRegIndex == 3 ? 2 : opCodeRegIndex; // 4th row is HL- instead of SP
-                            int memoryAddr = reg.Get16BitRegister(reg16Index);
-
-                            if (!isRightHalfBlock)
-                                // LD (reg16),A
-                                memory[memoryAddr] = reg.A;
-                            else
-                                // LD A,(reg16)
-                                reg.A = memory[memoryAddr];
-
-
-                            if (opCodeRegIndex == 2)
-                                unchecked { reg.HL++; } // carry flag not set if HL overflows
-                            else if (opCodeRegIndex == 3)
-                                unchecked { reg.HL--; } // underflow never sets any flags
-
-                            reg.PC += 1;
-                            continue;
-
-                            // TODO: make default case throw exception once all cases are accounted for?
-                    }
+                    if (ExecuteOpcode_FirstQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex))
+                        continue;
                 }
                 else if (isBottomHalfBlock != isQ2orQ4Block)
                 {
@@ -226,29 +203,17 @@ namespace GameBoyEmu
 
                     if (isBottomHalfBlock)
                     {
-                        // Arithmetic operation (for now XOR A is handled below)
+                        // Arithmetic operation (for now XOR A is handled in ExecuteOpcode_Misc)
                         if (opCode != (byte)OpCode.XOR_A)
-                            throw new NotImplementedException("Arithmetic operations");
+                        {
+                            ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index);
+                            continue;
+                        }
                     }
                     else
-                    //if(opCode >= 0x40 && opCode <= 0x7f)
                     {
-                        // 8-bit load operation (from register or memory, but not from 8-bit literal)
-                        int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
-
-                        // TODO: handle HALT special case. Need to "halt until interrupt occurs"
-                        if (opCode == (byte)OpCode.HALT)
-                            throw new NotImplementedException("HALT");
-
-                        // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                        byte regOrMemVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
-
-                        if (destReg8Index == 6)
-                            memory[reg.HL] = regOrMemVal;
-                        else
-                            reg.Set8BitRegister(destReg8Index, regOrMemVal);
-
-                        reg.PC += 1;
+                        // 8-bit load operation from register or memory, but not from 8-bit literal
+                        ExecuteOpcode_LoadRegOrMem_Main(opCode, srcReg8Index);
                         continue;
                     }
                 }
@@ -262,48 +227,122 @@ namespace GameBoyEmu
                     throw new NotImplementedException("Bottom quarter block operations");
                 }
 
-                // General instructions, handled individually rather than decoded from opcode
-                switch (opCode)
-                {
-                    // NOP
-                    case (byte)OpCode.NOP:
-                        break;
-
-                    // LD BC,d16
-                    case (byte)OpCode.LD_BC_d16:
-                        reg.BC = literal16Bit;
-                        break;
-
-                    // LD SP,d16
-                    case (byte)OpCode.LD_SP_d16:
-                        reg.SP = literal16Bit;
-                        break;
-
-                    // LD HL,d16
-                    case (byte)OpCode.LD_HL_d16:
-                        reg.HL = literal16Bit;
-                        break;
-
-                    // LD A,d8
-                    case (byte)OpCode.LD_A_d8:
-                        reg.A = literal8Bit;
-                        break;
-
-                    // XOR A
-                    case (byte)OpCode.XOR_A:
-                        reg.A = (byte)(reg.A ^ reg.A);
-                        reg.PC += 1;
-                        continue;
-
-                    case InvalidOpCode1:
-                        throw new ArgumentException("Invalid opcode: 0xdd");
-
-                    default:
-                        throw new ArgumentOutOfRangeException(nameof(opCode), opCode, null);
-                }
-
-                reg.PC += InstructionSize[opCode];
+                ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
             }
+        }
+
+        private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex)
+        {
+            Debug.Assert(opCode >= 0x00 && opCode <= 0x3f);
+
+            // TODO: handle other opcode families
+            switch (opCodeFamily)
+            {
+                // LD (reg16),A or LD A,(reg16) with mandatory post-increment or post-decrement if HL is the 16-bit register
+                case 2:
+                    int reg16Index = opCodeRegIndex == 3 ? 2 : opCodeRegIndex; // 4th row is HL- instead of SP
+                    int memoryAddr = reg.Get16BitRegister(reg16Index);
+
+                    if (!isRightHalfBlock)
+                        // LD (reg16),A
+                        memory[memoryAddr] = reg.A;
+                    else
+                        // LD A,(reg16)
+                        reg.A = memory[memoryAddr];
+
+
+                    if (opCodeRegIndex == 2)
+                        unchecked { reg.HL++; } // carry flag not set if HL overflows
+                    else if (opCodeRegIndex == 3)
+                        unchecked { reg.HL--; } // underflow never sets any flags
+
+                    reg.PC += 1;
+                    return true;
+
+                // TODO: make default case throw exception once all cases are accounted for?
+                default:
+                    return false;
+            }
+        }
+
+        // Some arithmetic opcodes are outside the scope of this method
+        private void ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index)
+        {
+            Debug.Assert(opCode >= 0x80 && opCode <= 0xbf);
+
+            // TODO
+            throw new NotImplementedException("Arithmetic operations");
+        }
+
+        // 8-bit load operation from register or memory, but not from 8-bit literal
+        // Outside the scope of this method: loading a literal into a register, and (some) indirect memory read/writes
+        private void ExecuteOpcode_LoadRegOrMem_Main(byte opCode, int srcReg8Index)
+        {
+            Debug.Assert(opCode >= 0x40 && opCode <= 0x7f);
+
+            int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
+
+            // TODO: handle HALT special case. Need to "halt until interrupt occurs"
+            if (opCode == (byte)OpCode.HALT)
+                throw new NotImplementedException("HALT");
+
+            // 'register' index 6 is a special case: read/write memory location indexed by HL register
+            byte regOrMemVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
+
+            if (destReg8Index == 6)
+                memory[reg.HL] = regOrMemVal;
+            else
+                reg.Set8BitRegister(destReg8Index, regOrMemVal);
+
+            reg.PC++;
+        }
+
+        private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit, ushort literal16Bit)
+        {
+            Debug.Assert(opCode >= 0x00 && opCode <= 0xff);
+
+            // General instructions, handled individually rather than decoded from opcode
+            switch (opCode)
+            {
+                // NOP
+                case (byte)OpCode.NOP:
+                    break;
+
+                // LD BC,d16
+                case (byte)OpCode.LD_BC_d16:
+                    reg.BC = literal16Bit;
+                    break;
+
+                // LD SP,d16
+                case (byte)OpCode.LD_SP_d16:
+                    reg.SP = literal16Bit;
+                    break;
+
+                // LD HL,d16
+                case (byte)OpCode.LD_HL_d16:
+                    reg.HL = literal16Bit;
+                    break;
+
+                // LD A,d8
+                case (byte)OpCode.LD_A_d8:
+                    reg.A = literal8Bit;
+                    break;
+
+                // XOR A
+                case (byte)OpCode.XOR_A:
+                    reg.A = (byte)(reg.A ^ reg.A);
+                    // TODO: only needed because I have not bothered adding this opcode to the InstructionSize array
+                    reg.PC++;
+                    return;
+
+                case InvalidOpCode1:
+                    throw new ArgumentException("Invalid opcode: 0xdd");
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(opCode), opCode, null);
+            }
+
+            reg.PC += InstructionSize[opCode];
         }
     }
 }
