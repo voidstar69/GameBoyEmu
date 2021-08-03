@@ -150,6 +150,13 @@ namespace EmulatorTests
         }
 
         [Test]
+        public void HALT()
+        {
+            emulator.InjectRom(new byte[] { (byte)OpCode.HALT });
+            Assert.Throws<System.NotImplementedException>(() => emulator.Run());
+        }
+
+        [Test]
         public void XOR_A()
         {
             emulator.InjectRom(new byte[] { Op.XOR_A });

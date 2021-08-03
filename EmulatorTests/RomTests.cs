@@ -21,9 +21,18 @@ namespace EmulatorTests
             emulator.InjectRom(romData);
             emulator.Run(3);
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(0x0, register.BC);
-            Assert.AreEqual(0x0, register.B);
-            Assert.AreEqual(0x0, register.C);
+            Assert.AreEqual(7, register.PC);
+            Assert.AreEqual(0xfffe, register.SP);
+            Assert.AreEqual(0x9fff, register.HL);
+            Assert.AreEqual(0x9f, register.H);
+            Assert.AreEqual(0xff, register.L);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.C);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.D);
+            Assert.AreEqual(0, register.E);
         }
     }
 }

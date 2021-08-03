@@ -9,6 +9,7 @@ namespace GameBoyEmu
         LD_BC_d16 = 0x01,
         LD_SP_d16 = 0x31,
         LD_A_d8 = 0x3e,
+        HALT = 0x76,
         LD_HLmem_A = 0x77,  // LD (HL),A
         LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf
@@ -163,8 +164,8 @@ namespace GameBoyEmu
 
                         int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
 
-                        // TODO: opcode 0x76 is a special case: HALT
-                        if (opCode == 0x76)
+                        // TODO: handle HALT special case. Need to "halt until interrupt occurs"
+                        if (opCode == (byte)OpCode.HALT)
                             throw new NotImplementedException("HALT");
 
                         // 'register' index 6 is a special case: read/write memory location indexed by HL register
