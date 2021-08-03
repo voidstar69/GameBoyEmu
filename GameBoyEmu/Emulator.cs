@@ -17,17 +17,18 @@ namespace GameBoyEmu
 
     public struct RegisterSet
     {
-        public ushort PC;
-        public ushort SP;
-
         // TODO: change these into 'file registers', an array of 8-bit registers?
-        public byte A;
+        public byte A; // accumulator register
+        public byte F; // flags register
         public byte B;
         public byte C;
         public byte D;
         public byte E;
         public byte H;
         public byte L;
+
+        public ushort SP; // stack pointer
+        public ushort PC; // program counter
 
         public ushort BC
         {
@@ -91,11 +92,41 @@ namespace GameBoyEmu
             };
         }
 
-        // TODO: Get/Set 16-bit registers
+        public ushort Get16BitRegister(int index)
+        {
+            return index switch
+            {
+                0 => BC,
+                1 => DE,
+                2 => HL,
+                3 => SP,
+                _ => throw new ArgumentOutOfRangeException(nameof(index), index, "index of 16-bit register"),
+            };
+        }
+
+        public void Set16BitRegister(int index, ushort value)
+        {
+            switch (index)
+            {
+                case 0: BC = value; break;
+                case 1: DE = value; break;
+                case 2: HL = value; break;
+                case 3: SP = value; break;
+                default: throw new ArgumentOutOfRangeException(nameof(index), index, "index of 16-bit register");
+            };
+        }
     }
 
     public class Emulator
     {
+        // Public
+        public static byte DefaultMemoryByteValue { get => InvalidOpCode1; }
+
+        public RegisterSet Registers => reg;
+
+        public byte[] Memory => memory;
+
+        // Private
         private const byte InvalidOpCode1 = 0xDD;
 
         private static readonly byte[] InstructionSize =
@@ -109,13 +140,11 @@ namespace GameBoyEmu
             // Not bothered yet to add XOR A (opcode 0xAF) yet. Special cased this in the code
         };
 
-        public byte[] Memory => memory;
-
-        private readonly byte[] memory = new byte[512];
+        // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff
+        // TODO: Later on map some high memory accesses directly to VRAM instead of system memory.
+        private readonly byte[] memory = new byte[0xa000];
 
         // registers
-        public RegisterSet Registers => reg;
-
         private RegisterSet reg;
 
         public Emulator()
@@ -128,7 +157,7 @@ namespace GameBoyEmu
             //Array.Clear(memory, 0, memory.Length);
 
             for (int i = romData.Length; i < memory.Length; i++)
-                memory[i] = InvalidOpCode1;
+                memory[i] = DefaultMemoryByteValue;
 
             Array.Copy(romData, memory, romData.Length);
 
@@ -149,14 +178,42 @@ namespace GameBoyEmu
                 bool isBottomHalfBlock = ((opCode >> 7) & 1) == 1; // 0 = top half of opcodes, including 8-bit load ops. 1 = bottom half of opcodes, including arithmetic ops
                 bool isQ2orQ4Block = ((opCode >> 6) & 1) == 1; // 0 = Arithmetic ops or top quarter opcodes. 1 = 8-bit load ops or bottom quarter opcodes.
 
-                if(!isBottomHalfBlock && !isQ2orQ4Block)
+                if (!isBottomHalfBlock && !isQ2orQ4Block)
                 {
                     // Instruction decoder for (some of) instructions in top quarter block (0x00 to 0x3f)
 
-                    // TODO
-                    //throw new NotImplementedException("Top quarter block operations");
+                    int opCodeFamily = opCode & 0x07; // 0..7, index of column in left or right half of opcode block
+                    bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
+                    int opCodeRegIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q1
+
+                    // TODO: handle other opcode families
+                    switch (opCodeFamily)
+                    {
+                        // LD (reg16),A or LD A,(reg16) with mandatory post-increment or post-decrement if HL is the 16-bit register
+                        case 2:
+                            int reg16Index = opCodeRegIndex == 3 ? 2 : opCodeRegIndex; // 4th row is HL- instead of SP
+                            int memoryAddr = reg.Get16BitRegister(reg16Index);
+
+                            if (!isRightHalfBlock)
+                                // LD (reg16),A
+                                memory[memoryAddr] = reg.A;
+                            else
+                                // LD A,(reg16)
+                                reg.A = memory[memoryAddr];
+
+
+                            if (opCodeRegIndex == 2)
+                                unchecked { reg.HL++; } // carry flag not set if HL overflows
+                            else if (opCodeRegIndex == 3)
+                                unchecked { reg.HL--; } // underflow never sets any flags
+
+                            reg.PC += 1;
+                            continue;
+
+                            // TODO: make default case throw exception once all cases are accounted for?
+                    }
                 }
-                else if(isBottomHalfBlock != isQ2orQ4Block)
+                else if (isBottomHalfBlock != isQ2orQ4Block)
                 {
                     // Instruction decoder for middle block of Load and Arithmetic instructions (0x40 to 0xbf)
                     // isBottomHalfBlock: 0 = Load, 1 = Arithmetic
@@ -177,7 +234,6 @@ namespace GameBoyEmu
                     //if(opCode >= 0x40 && opCode <= 0x7f)
                     {
                         // 8-bit load operation (from register or memory, but not from 8-bit literal)
-
                         int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
 
                         // TODO: handle HALT special case. Need to "halt until interrupt occurs"

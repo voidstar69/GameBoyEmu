@@ -26,7 +26,7 @@ namespace EmulatorTests
         }
 
         [Test]
-        public void Nop()
+        public void NOP()
         {
             emulator.InjectRom(new byte[] { (byte)OpCode.NOP });
             emulator.Run(1);
@@ -116,7 +116,7 @@ namespace EmulatorTests
         }
 
         [Test]
-        public void Load_memory_from_8bit_register()
+        public void Load_memory_from_any_8bit_register_A()
         {
             emulator.InjectRom(new byte[] { Op.LD_A_d8, 0xbc, Op.LD_HLmem_A }); // LD A,d8 | LD (HL),A
             emulator.Run(2);
@@ -134,7 +134,27 @@ namespace EmulatorTests
         }
 
         [Test]
-        public void Load_8bit_register_from_memory()
+        public void Load_memory_from_any_8bit_register_C()
+        {
+            emulator.InjectRom(new byte[] { Op.LD_BC_d16, 0xcd, 0xab, 0x71 }); // LD BC,d16 | LD (HL),C
+            emulator.Run(2);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0xabcd, register.BC);
+            Assert.AreEqual(0xcd, register.C);
+            Assert.AreEqual(0, register.HL);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0xcd, memory[0]);
+            Assert.AreEqual(0xcd, memory[1]);
+            Assert.AreEqual(0xab, memory[2]);
+            Assert.AreEqual(0x71, memory[3]);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
+        public void Load_any_8bit_register_from_memory_A()
         {
             emulator.InjectRom(new byte[] { Op.LD_A_HLmem }); // LD A,(HL)
             emulator.Run(1);
@@ -144,6 +164,61 @@ namespace EmulatorTests
             Assert.AreEqual(0, register.HL);
             byte[] memory = emulator.Memory;
             Assert.AreEqual(0x7e, memory[0]);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
+        public void Load_accumulator_into_memory_indexed_by_BC_register()
+        {
+            const int memAddr = 0x9abc;
+            emulator.InjectRom(new byte[] { Op.LD_BC_d16, 0xbc, 0x9a, 0x02 }); // LD BC,d16 | LD (BC),A
+            emulator.Run(2);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(memAddr, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.HL);
+            Assert.AreEqual(0, register.SP);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(Op.LD_BC_d16, memory[0]);
+            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[4]);
+            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[memAddr - 1]);
+            Assert.AreEqual(0, memory[memAddr]);
+            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[memAddr + 1]);
+        }
+
+        [Test]
+        public void Load_memory_from_accumulator_and_decrement_HL_index_register()
+        {
+            emulator.InjectRom(new byte[] { 0x32 }); // LD (HL-),A
+            emulator.Run(1);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(1, register.PC);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0xffff, register.HL); // underflows from 0 to reach (2^16)-1
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0x0, memory[0]);
+            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[1]);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
+        public void Load_memory_from_accumulator_and_increment_HL_index_register()
+        {
+            emulator.InjectRom(new byte[] { 0x22 }); // LD (HL+),A
+            emulator.Run(1);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(1, register.PC);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0x1, register.HL);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0x0, memory[0]);
+            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[1]);
             Assert.AreEqual(0, register.BC);
             Assert.AreEqual(0, register.DE);
             Assert.AreEqual(0, register.SP);

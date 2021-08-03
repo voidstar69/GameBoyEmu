@@ -4,7 +4,7 @@ namespace GameBoyEmu
 {
     static class Program
     {
-        static void Main(string[] args)
+        static void Main()
         {
             Console.WriteLine("Attempting emulation of GameBoy!");
             Console.WriteLine();
