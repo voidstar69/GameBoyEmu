@@ -8,8 +8,8 @@ namespace EmulatorTests
         // Cannot be a byte enum as individual enum values have to be casted to bytes
         private static class Op
         {
-            public const byte LD_HL_d16 = (byte)OpCode.LD_HL_d16;
             public const byte LD_BC_d16 = (byte)OpCode.LD_BC_d16;
+            public const byte LD_HL_d16 = (byte)OpCode.LD_HL_d16;
             public const byte LD_SP_d16 = (byte)OpCode.LD_SP_d16;
             public const byte LD_A_d8 = (byte)OpCode.LD_A_d8;
             public const byte LD_HLmem_A = (byte)OpCode.LD_HLmem_A;
@@ -28,7 +28,7 @@ namespace EmulatorTests
         [Test]
         public void Nop()
         {
-            emulator.InjectRom(new byte[] { 0x00 });
+            emulator.InjectRom(new byte[] { (byte)OpCode.NOP });
             emulator.Run(1);
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(1, register.PC);

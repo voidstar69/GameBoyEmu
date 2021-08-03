@@ -5,8 +5,8 @@ namespace GameBoyEmu
     public enum OpCode : byte
     {
         NOP = 0x00,
-        LD_HL_d16 = 0x21,
         LD_BC_d16 = 0x01,
+        LD_HL_d16 = 0x21,
         LD_SP_d16 = 0x31,
         LD_A_d8 = 0x3e,
         HALT = 0x76,
@@ -146,18 +146,34 @@ namespace GameBoyEmu
 
                 Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
 
-                // Instruction decoder for middle block of Load and Artihmetic instructions (0x40 to 0xbf)
-                // TODO: check topOrBottomBlock and q2orQ4Block instead of opcode range
-                if (opCode >= 0x40 && opCode <= 0xbf)
+                bool isBottomHalfBlock = ((opCode >> 7) & 1) == 1; // 0 = top half of opcodes, including 8-bit load ops. 1 = bottom half of opcodes, including arithmetic ops
+                bool isQ2orQ4Block = ((opCode >> 6) & 1) == 1; // 0 = Arithmetic ops or top quarter opcodes. 1 = 8-bit load ops or bottom quarter opcodes.
+
+                if(!isBottomHalfBlock && !isQ2orQ4Block)
                 {
-                    int topOrBottomBlock = (opCode >> 7) & 0x01; // 0 = Load. 1 = Arithmetic
-                    int q2orQ4Block = (opCode >> 6) & 0x01; // 1 = Load. 0 = Arithmetic. Must be opposite of topOrBottom
-                    if (q2orQ4Block == topOrBottomBlock)
+                    // Instruction decoder for (some of) instructions in top quarter block (0x00 to 0x3f)
+
+                    // TODO
+                    //throw new NotImplementedException("Top quarter block operations");
+                }
+                else if(isBottomHalfBlock != isQ2orQ4Block)
+                {
+                    // Instruction decoder for middle block of Load and Arithmetic instructions (0x40 to 0xbf)
+                    // isBottomHalfBlock: 0 = Load, 1 = Arithmetic
+                    // isTopQ2orQ4Block: 0 = Arithmetic, 1 = Load. Must be opposite of topOrBottom
+
+                    if (isQ2orQ4Block == isBottomHalfBlock)
                         throw new InvalidOperationException("Should never occur!");
 
                     int srcReg8Index = opCode & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
 
-                    if (topOrBottomBlock == 0)
+                    if (isBottomHalfBlock)
+                    {
+                        // Arithmetic operation (for now XOR A is handled below)
+                        if (opCode != (byte)OpCode.XOR_A)
+                            throw new NotImplementedException("Arithmetic operations");
+                    }
+                    else
                     //if(opCode >= 0x40 && opCode <= 0x7f)
                     {
                         // 8-bit load operation (from register or memory, but not from 8-bit literal)
@@ -179,12 +195,15 @@ namespace GameBoyEmu
                         reg.PC += 1;
                         continue;
                     }
-                    else
-                    {
-                        // Arithmetic operation (for now XOR A is handled below)
-                        if (opCode != (byte)OpCode.XOR_A)
-                            throw new NotImplementedException("Arithmetic operations");
-                    }
+                }
+                else
+                {
+                    // Instruction decoder for (some of) instructions in bottom quarter block (0xc0 to 0xff)
+                    if (!isBottomHalfBlock || !isQ2orQ4Block)
+                        throw new NotImplementedException("Should never happen!");
+
+                    // TODO
+                    throw new NotImplementedException("Bottom quarter block operations");
                 }
 
                 // General instructions, handled individually rather than decoded from opcode
