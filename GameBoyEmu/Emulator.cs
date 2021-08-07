@@ -16,17 +16,27 @@ namespace GameBoyEmu
         XOR_A = 0xaf
     }
 
+    [Flags]
+    public enum Flag : byte
+    {
+        None = 0,   // no flags set
+        Z = 128,    // zero flag
+        N = 64,     // subtract flag
+        H = 32,     // half carry flag
+        C = 16      // carry flag
+    };
+
     public struct RegisterSet
     {
         // TODO: change these into 'file registers', an array of 8-bit registers?
         public byte A; // accumulator register
-        public byte F; // flags register
         public byte B;
         public byte C;
         public byte D;
         public byte E;
         public byte H;
         public byte L;
+        public Flag F; // flags register
 
         public ushort SP; // stack pointer
         public ushort PC; // program counter
@@ -59,6 +69,11 @@ namespace GameBoyEmu
                 H = (byte)(value >> 8);
                 L = (byte)(value & 0xff);
             }
+        }
+
+        public void SetFlags(bool zero, bool subtract, bool halfCarry, bool carry)
+        {
+            F = (zero ? Flag.Z : Flag.None) | (subtract ? Flag.N : Flag.None) | (halfCarry ? Flag.H : Flag.None) | (carry ? Flag.C : Flag.None);
         }
 
         public byte Get8BitRegister(int index)
@@ -206,7 +221,10 @@ namespace GameBoyEmu
                         // Arithmetic operation (for now XOR A is handled in ExecuteOpcode_Misc)
                         if (opCode != (byte)OpCode.XOR_A)
                         {
-                            ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index);
+                            bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
+                            int opCodeRowIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q3
+
+                            ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex);
                             continue;
                         }
                     }
@@ -250,11 +268,10 @@ namespace GameBoyEmu
                         // LD A,(reg16)
                         reg.A = memory[memoryAddr];
 
-
                     if (opCodeRegIndex == 2)
-                        unchecked { reg.HL++; } // carry flag not set if HL overflows
+                        reg.HL++; // carry flag not set if HL overflows
                     else if (opCodeRegIndex == 3)
-                        unchecked { reg.HL--; } // underflow never sets any flags
+                        reg.HL--; // underflow never sets any flags
 
                     reg.PC += 1;
                     return true;
@@ -266,12 +283,46 @@ namespace GameBoyEmu
         }
 
         // Some arithmetic opcodes are outside the scope of this method
-        private void ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index)
+        private void ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index, bool isRightHalfBlock, int opCodeRowIndex)
         {
             Debug.Assert(opCode >= 0x80 && opCode <= 0xbf);
 
-            // TODO
-            throw new NotImplementedException("Arithmetic operations");
+            // 'register' index 6 is a special case: read/write memory location indexed by HL register
+            byte operandVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
+
+            // TODO: handle other opcode families
+            byte newVal;
+            switch (opCodeRowIndex)
+            {
+                // ADD / ADC (add with carry)
+                case 0:
+                    newVal = (byte)(reg.A + operandVal);
+                    if (isRightHalfBlock && (reg.F & Flag.C) != 0)
+                        newVal++;
+
+                    // set flags - Z 0 H C
+                    reg.SetFlags(zero: newVal == 0, subtract: false, halfCarry: newVal >= 128 && operandVal > 0, carry: newVal < reg.A);
+
+                    reg.A = newVal;
+                    break;
+
+                // SUB / SBC (subtract with carry)
+                case 1:
+                    newVal = (byte)(reg.A - operandVal);
+                    if (isRightHalfBlock && (reg.F & Flag.C) != 0)
+                        newVal--;
+
+                    // set flags - Z 1 H C
+                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: newVal < 128 && operandVal > 0, carry: newVal > reg.A);
+
+                    reg.A = newVal;
+                    break;
+
+                default:
+                    throw new NotImplementedException("Arithmetic operations");
+            }
+
+            reg.PC++;
         }
 
         // 8-bit load operation from register or memory, but not from 8-bit literal

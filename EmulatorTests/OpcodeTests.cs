@@ -15,6 +15,9 @@ namespace EmulatorTests
             public const byte LD_HLmem_A = (byte)OpCode.LD_HLmem_A;
             public const byte LD_A_HLmem = (byte)OpCode.LD_A_HLmem;
             public const byte XOR_A = (byte)OpCode.XOR_A;
+
+            public const byte ADD_A_A = 0x87;
+            public const byte ADC_A_A = 0x8F;
         }
 
         private Emulator emulator;
@@ -229,6 +232,34 @@ namespace EmulatorTests
         {
             emulator.InjectRom(new byte[] { (byte)OpCode.HALT });
             Assert.Throws<System.NotImplementedException>(() => emulator.Run());
+        }
+
+        [Test]
+        public void ADD_A_A()
+        {
+            // cause a half carry
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x44, Op.ADD_A_A });
+            emulator.Run(2);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(3, register.PC);
+            Assert.AreEqual(0x88, register.A);
+            Assert.AreEqual(Flag.H, register.F);
+
+            // cause a zero result
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x80, Op.ADD_A_A });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(3, register.PC);
+            Assert.AreEqual(0x0, register.A);
+            Assert.AreEqual(Flag.Z | Flag.C, register.F);
+
+            // this depends on the Zero and Carry flags being previously set
+            emulator.InjectRom(new byte[] { Op.ADC_A_A });
+            emulator.Run(1);
+            register = emulator.Registers;
+            Assert.AreEqual(1, register.PC);
+            Assert.AreEqual(0x1, register.A);
+            Assert.AreEqual(Flag.None, register.F);
         }
 
         [Test]
