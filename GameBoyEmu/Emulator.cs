@@ -3,7 +3,7 @@ using System.Diagnostics;
 
 namespace GameBoyEmu
 {
-    // most of the 256 possible byte values map to valid instructions (operation codes)
+    // most of the 256 possible byte values are to valid instructions (operation codes)
     public enum OpCode : byte
     {
         NOP = 0x00,
@@ -179,7 +179,7 @@ namespace GameBoyEmu
 
             Array.Copy(romData, memory, romData.Length);
 
-            reg.PC = 0; // TODO: correct behaviour?
+            reg.PC = 0;
         }
 
         public void Run(int numInstructions = -1)
@@ -204,7 +204,7 @@ namespace GameBoyEmu
                     bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
                     int opCodeRegIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q1
 
-                    if (ExecuteOpcode_FirstQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex))
+                    if (ExecuteOpcode_FirstQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex, literal8Bit))
                         continue;
                 }
                 else if (isBottomHalfBlock != isQ2orQ4Block)
@@ -242,8 +242,8 @@ namespace GameBoyEmu
 
                     if (opCode == (byte)OpCode.PREFIX_CB)
                     {
-                        if (ExecuteOpcode_ExpandedOpcodes(expandedOpCode: literal8Bit))
-                            continue;
+                        ExecuteOpcode_ExpandedOpcodes(expandedOpCode: literal8Bit);
+                        continue;
                     }
 
                     // TODO
@@ -254,35 +254,74 @@ namespace GameBoyEmu
             }
         }
 
-        private bool ExecuteOpcode_ExpandedOpcodes(byte expandedOpCode)
-        {
-            reg.PC += 2;
-
-            // BIT 7,H
-            if (expandedOpCode == 0x7C)
-            {
-                const int bitPosition = 7;
-
-                // test bit 7 (the highest bit)
-                // TODO: bit numbering - is bit 7 the highest or lowest bit?
-                bool bitNotSet = (reg.H & (1 << bitPosition)) == 0;
-
-                // set flags register: Z 0 1 -
-                reg.SetFlags(zero: bitNotSet, subtract: false, halfCarry: true, carry: (reg.F & Flag.C) != 0);
-                return true;
-            }
-
-            // TODO: implement the rest
-            return false;
-        }
-
-        private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex)
+        private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit)
         {
             Debug.Assert(opCode >= 0x00 && opCode <= 0x3f);
+            Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
+            Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
 
             // TODO: handle other opcode families
             switch (opCodeFamily)
             {
+                case 0:
+                    sbyte offset = (sbyte)literal8Bit;
+                    reg.PC += 2;
+                    if (isRightHalfBlock)
+                    {
+                        switch (opCodeRegIndex)
+                        {
+                            // TODO: implement 'LD (a16),SP'. 3 byte instruction.
+                            case 0: throw new NotImplementedException("LD (a16),SP");
+
+                            // Jump Relative
+
+                            // JR r8
+                            case 1:
+                                reg.PC = (ushort)(reg.PC + offset);
+                                return true;
+
+                            // JR Z r8
+                            case 2:
+                                if ((reg.F & Flag.Z) != 0)
+                                    reg.PC = (ushort)(reg.PC + offset);
+                                return true;
+
+                            // JR C r8
+                            case 3:
+                                if ((reg.F & Flag.C) != 0)
+                                    reg.PC = (ushort)(reg.PC + offset);
+                                return true;
+                        }
+                    }
+                    else
+                    {
+                        switch (opCodeRegIndex)
+                        {
+                            // NOP
+                            case 0:
+                                reg.PC -= 1; // undo the 'PC += 2' done above
+                                return true;
+
+                            // TODO: implement STOP. 2 byte instruction.
+                            case 1: throw new NotImplementedException("STOP");
+
+                            // Jump Relative
+
+                            // JR NZ r8
+                            case 2:
+                                if ((reg.F & Flag.Z) == 0)
+                                    reg.PC = (ushort)(reg.PC + offset);
+                                return true;
+
+                            // JR NC r8
+                            case 3:
+                                if ((reg.F & Flag.C) == 0)
+                                    reg.PC = (ushort)(reg.PC + offset);
+                                return true;
+                        }
+                    }
+                    throw new NotImplementedException("Should never reach here!");
+
                 // LD (reg16),A or LD A,(reg16) with mandatory post-increment or post-decrement if HL is the 16-bit register
                 case 2:
                     int reg16Index = opCodeRegIndex == 3 ? 2 : opCodeRegIndex; // 4th row is HL- instead of SP
@@ -367,7 +406,7 @@ namespace GameBoyEmu
                 //    break;
 
                 default:
-                    throw new NotImplementedException("Arithmetic operations");
+                    throw new NotImplementedException("Some arithmetic operations not yet implemented");
             }
 
             reg.PC++;
@@ -396,6 +435,26 @@ namespace GameBoyEmu
             reg.PC++;
         }
 
+        // All 2-byte opcodes with a 0xCB prefix. Generally bitwise operations.
+        private void ExecuteOpcode_ExpandedOpcodes(byte expandedOpCode)
+        {
+            reg.PC += 2;
+
+            // BIT 7,H
+            if (expandedOpCode == 0x7C)
+            {
+                const int bitPosition = 7;
+
+                // test bit 7 (the highest bit)
+                bool bitNotSet = (reg.H & (1 << bitPosition)) == 0;
+
+                // set flags register: Z 0 1 -
+                reg.SetFlags(zero: bitNotSet, subtract: false, halfCarry: true, carry: (reg.F & Flag.C) != 0);
+            }
+            else
+                throw new NotImplementedException("Some arithmetic operations not yet implemented");
+        }
+
         private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit, ushort literal16Bit)
         {
             Debug.Assert(opCode >= 0x00 && opCode <= 0xff);
@@ -403,10 +462,6 @@ namespace GameBoyEmu
             // General instructions, handled individually rather than decoded from opcode
             switch (opCode)
             {
-                // NOP
-                case (byte)OpCode.NOP:
-                    break;
-
                 // LD BC,d16
                 case (byte)OpCode.LD_BC_d16:
                     reg.BC = literal16Bit;
