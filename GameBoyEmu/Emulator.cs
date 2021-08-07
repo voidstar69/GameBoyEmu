@@ -3,6 +3,7 @@ using System.Diagnostics;
 
 namespace GameBoyEmu
 {
+    // most of the 256 possible byte values map to valid instructions (operation codes)
     public enum OpCode : byte
     {
         NOP = 0x00,
@@ -13,7 +14,8 @@ namespace GameBoyEmu
         HALT = 0x76,
         LD_HLmem_A = 0x77,  // LD (HL),A
         LD_A_HLmem = 0x7e,  // LD A,(HL)
-        XOR_A = 0xaf
+        XOR_A = 0xaf,
+        PREFIX_CB = 0xCB    // prefix for expanded set of another 256 bit-wise instructions
     }
 
     [Flags]
@@ -145,7 +147,7 @@ namespace GameBoyEmu
         // Private
         private const byte InvalidOpCode1 = 0xDD;
 
-        private static readonly byte[] InstructionSize =
+        private static readonly byte[] MiscOpCodesSize =
         {
             // NOP | LD BC,d16 | LD (BC),A | ...
             1,3,1,1,1,1,2,1,3,1,1,1,1,1,2,1, // 0x
@@ -153,7 +155,7 @@ namespace GameBoyEmu
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 2x
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 3x
 
-            // Not bothered yet to add XOR A (opcode 0xAF) yet. Special cased this in the code
+            // other higher opcodes have hardcoded sizes
         };
 
         // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff
@@ -218,15 +220,12 @@ namespace GameBoyEmu
 
                     if (isBottomHalfBlock)
                     {
-                        // Arithmetic operation (for now XOR A is handled in ExecuteOpcode_Misc)
-                        if (opCode != (byte)OpCode.XOR_A)
-                        {
-                            bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
-                            int opCodeRowIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q3
+                        // Arithmetic operation
+                        bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
+                        int opCodeRowIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q3
 
-                            ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex);
-                            continue;
-                        }
+                        ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex);
+                        continue;
                     }
                     else
                     {
@@ -241,12 +240,40 @@ namespace GameBoyEmu
                     if (!isBottomHalfBlock || !isQ2orQ4Block)
                         throw new NotImplementedException("Should never happen!");
 
+                    if (opCode == (byte)OpCode.PREFIX_CB)
+                    {
+                        if (ExecuteOpcode_ExpandedOpcodes(expandedOpCode: literal8Bit))
+                            continue;
+                    }
+
                     // TODO
                     throw new NotImplementedException("Bottom quarter block operations");
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
             }
+        }
+
+        private bool ExecuteOpcode_ExpandedOpcodes(byte expandedOpCode)
+        {
+            reg.PC += 2;
+
+            // BIT 7,H
+            if (expandedOpCode == 0x7C)
+            {
+                const int bitPosition = 7;
+
+                // test bit 7 (the highest bit)
+                // TODO: bit numbering - is bit 7 the highest or lowest bit?
+                bool bitNotSet = (reg.H & (1 << bitPosition)) == 0;
+
+                // set flags register: Z 0 1 -
+                reg.SetFlags(zero: bitNotSet, subtract: false, halfCarry: true, carry: (reg.F & Flag.C) != 0);
+                return true;
+            }
+
+            // TODO: implement the rest
+            return false;
         }
 
         private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex)
@@ -290,7 +317,6 @@ namespace GameBoyEmu
             // 'register' index 6 is a special case: read/write memory location indexed by HL register
             byte operandVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
 
-            // TODO: handle other opcode families
             byte newVal;
             switch (opCodeRowIndex)
             {
@@ -317,6 +343,28 @@ namespace GameBoyEmu
 
                     reg.A = newVal;
                     break;
+
+                // AND / XOR
+                case 2:
+                    if (isRightHalfBlock)
+                    {
+                        // XOR
+                        reg.A = (byte)(reg.A ^ operandVal);
+                        reg.SetFlags(zero: reg.A == 0, subtract: false, halfCarry: false, carry: false);
+                    }
+                    else
+                    {
+                        // AND
+                        reg.A = (byte)(reg.A & operandVal);
+                        reg.SetFlags(zero: reg.A == 0, subtract: false, halfCarry: true, carry: false);
+                    }
+                    break;
+
+                // TODO: handle other opcode families
+
+                // OR / CP
+                //case 3:
+                //    break;
 
                 default:
                     throw new NotImplementedException("Arithmetic operations");
@@ -379,13 +427,6 @@ namespace GameBoyEmu
                     reg.A = literal8Bit;
                     break;
 
-                // XOR A
-                case (byte)OpCode.XOR_A:
-                    reg.A = (byte)(reg.A ^ reg.A);
-                    // TODO: only needed because I have not bothered adding this opcode to the InstructionSize array
-                    reg.PC++;
-                    return;
-
                 case InvalidOpCode1:
                     throw new ArgumentException("Invalid opcode: 0xdd");
 
@@ -393,7 +434,7 @@ namespace GameBoyEmu
                     throw new ArgumentOutOfRangeException(nameof(opCode), opCode, null);
             }
 
-            reg.PC += InstructionSize[opCode];
+            reg.PC += MiscOpCodesSize[opCode];
         }
     }
 }

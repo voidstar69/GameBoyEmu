@@ -270,6 +270,7 @@ namespace EmulatorTests
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0x0, register.A);
+            Assert.AreEqual(Flag.Z, register.F);
 
             // LD A,0xBC ; XOR A
             emulator.InjectRom(new byte[] { Op.LD_A_d8, 0xbc, Op.XOR_A });
@@ -277,6 +278,7 @@ namespace EmulatorTests
             register = emulator.Registers;
             Assert.AreEqual(3, register.PC);
             Assert.AreEqual(0x0, register.A);
+            Assert.AreEqual(Flag.Z, register.F);
         }
     }
 }

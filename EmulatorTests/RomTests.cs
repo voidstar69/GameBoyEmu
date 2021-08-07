@@ -23,6 +23,7 @@ namespace EmulatorTests
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(7, register.PC);
+            Assert.AreEqual(Flag.Z, register.F);
             Assert.AreEqual(0xfffe, register.SP);
             Assert.AreEqual(0x9fff, register.HL);
             Assert.AreEqual(0x9f, register.H);
@@ -41,16 +42,42 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-
             byte[] memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
-
             emulator.Run(4);
 
             memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0x9fff]);
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(8, register.PC);
+            Assert.AreEqual(Flag.Z, register.F);
+            Assert.AreEqual(0xfffe, register.SP);
+            Assert.AreEqual(0x9ffe, register.HL);
+            Assert.AreEqual(0x9f, register.H);
+            Assert.AreEqual(0xfe, register.L);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.C);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.D);
+            Assert.AreEqual(0, register.E);
+        }
+
+        [Test]
+        public void RunBootRom_5instructions()
+        {
+            var romData = File.ReadAllBytes("DMG_ROM.bin");
+            emulator.InjectRom(romData);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0xdd, memory[0x9fff]);
+            emulator.Run(5);
+
+            memory = emulator.Memory;
+            Assert.AreEqual(0x0, memory[0x9fff]);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(10, register.PC);
+            Assert.AreEqual(Flag.H, register.F);
             Assert.AreEqual(0xfffe, register.SP);
             Assert.AreEqual(0x9ffe, register.HL);
             Assert.AreEqual(0x9f, register.H);
