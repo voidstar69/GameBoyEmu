@@ -8,8 +8,10 @@ namespace GameBoyEmu
     {
         NOP = 0x00,
         LD_BC_d16 = 0x01,
+        INC_C = 0x0c,
         LD_HL_d16 = 0x21,
         LD_SP_d16 = 0x31,
+        INC_HLmem = 0x34,   // INC (HL)
         LD_A_d8 = 0x3e,
         HALT = 0x76,
         LD_HLmem_A = 0x77,  // LD (HL),A
@@ -342,6 +344,24 @@ namespace GameBoyEmu
                     reg.PC += 1;
                     return true;
 
+                // INC reg8 or INC (HL)
+                case 4:
+                    int reg8Index = (opCodeRegIndex << 1) + (isRightHalfBlock ? 1 : 0); // recombine 1+2 bits = 3 bits (but in opposite order)
+
+                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                    byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                    value++;
+
+                    if (reg8Index == 6)
+                        memory[reg.HL] = value;
+                    else
+                        reg.Set8BitRegister(reg8Index, value);
+
+                    // set flags register: Z 0 H -
+                    reg.SetFlags(zero: value == 0, subtract: false, halfCarry: value == 16, carry: (reg.F & Flag.C) != 0);
+                    reg.PC += 1;
+                    return true;
+
                 // TODO: make default case throw exception once all cases are accounted for?
                 default:
                     return false;
@@ -365,8 +385,8 @@ namespace GameBoyEmu
                     if (isRightHalfBlock && (reg.F & Flag.C) != 0)
                         newVal++;
 
-                    // set flags - Z 0 H C
-                    reg.SetFlags(zero: newVal == 0, subtract: false, halfCarry: newVal >= 128 && operandVal > 0, carry: newVal < reg.A);
+                    // set flags register: Z 0 H C
+                    reg.SetFlags(zero: newVal == 0, subtract: false, halfCarry: (newVal & 0x0f) < (reg.A & 0x0f), carry: newVal < reg.A);
 
                     reg.A = newVal;
                     break;
@@ -377,8 +397,8 @@ namespace GameBoyEmu
                     if (isRightHalfBlock && (reg.F & Flag.C) != 0)
                         newVal--;
 
-                    // set flags - Z 1 H C
-                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: newVal < 128 && operandVal > 0, carry: newVal > reg.A);
+                    // set flags register: Z 1 H C
+                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: newVal < 16 && operandVal > 0, carry: newVal > reg.A);
 
                     reg.A = newVal;
                     break;

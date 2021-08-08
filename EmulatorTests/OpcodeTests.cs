@@ -59,6 +59,68 @@ namespace EmulatorTests
         }
 
         [Test]
+        public void INC_C()
+        {
+            emulator.InjectRom(new byte[] { (byte)OpCode.INC_C });
+            emulator.Run(1);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(1, register.PC);
+            Assert.AreEqual(1, register.C);
+            Assert.AreEqual(Flag.None, register.F);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.HL);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
+        public void INC_memory_indexed_by_HL()
+        {
+            // increment memory location zero
+            emulator.InjectRom(new byte[] { (byte)OpCode.INC_HLmem });
+            emulator.Run(1);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(1, register.PC);
+            Assert.AreEqual(0, register.HL);
+            Assert.AreEqual(Flag.None, register.F);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0x35, memory[0]);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+
+            // cause a zero result (carry flag not affected by INC instructions)
+            emulator.InjectRom(new byte[] { Op.LD_HL_d16, 0x04, 0x00, (byte)OpCode.INC_HLmem, 0xff });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0x4, register.HL);
+            Assert.AreEqual(Flag.Z, register.F);
+            memory = emulator.Memory;
+            Assert.AreEqual(0x00, memory[4]);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+
+            // cause a half carry
+            emulator.InjectRom(new byte[] { Op.LD_HL_d16, 0x04, 0x00, (byte)OpCode.INC_HLmem, 0x0f });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0x4, register.HL);
+            Assert.AreEqual(Flag.H, register.F);
+            memory = emulator.Memory;
+            Assert.AreEqual(0x10, memory[4]);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
         public void LD_SP_d16()
         {
             emulator.InjectRom(new byte[] { Op.LD_SP_d16, 0xcd, 0xab });
@@ -235,15 +297,23 @@ namespace EmulatorTests
         }
 
         [Test]
-        public void ADD_A_A()
+        public void ADD_A_A_and_ADC_A_A()
         {
             // cause a half carry
-            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x44, Op.ADD_A_A });
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x48, Op.ADD_A_A });
             emulator.Run(2);
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(3, register.PC);
-            Assert.AreEqual(0x88, register.A);
+            Assert.AreEqual(0x90, register.A);
             Assert.AreEqual(Flag.H, register.F);
+
+            // do not cause a half carry (only if bottom 4 bits overflow)
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x44, Op.ADD_A_A });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(3, register.PC);
+            Assert.AreEqual(0x88, register.A);
+            Assert.AreEqual(Flag.None, register.F);
 
             // cause a zero result
             emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x80, Op.ADD_A_A });
@@ -253,7 +323,7 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, register.A);
             Assert.AreEqual(Flag.Z | Flag.C, register.F);
 
-            // this depends on the Zero and Carry flags being previously set
+            // this depends on the carry flag being previously set
             emulator.InjectRom(new byte[] { Op.ADC_A_A });
             emulator.Run(1);
             register = emulator.Registers;

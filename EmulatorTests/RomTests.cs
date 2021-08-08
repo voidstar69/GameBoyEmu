@@ -131,11 +131,44 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
-            emulator.Run(8 * 1024 * 3 + 3);
+            emulator.Run(3 + 8 * 1024 * 3);
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(0xc, register.PC);
             Assert.AreEqual(Flag.Z | Flag.H, register.F);
+            Assert.AreEqual(0xfffe, register.SP);
+            Assert.AreEqual(0x7fff, register.HL);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.BC);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.C);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.D);
+            Assert.AreEqual(0, register.E);
+
+            memory = emulator.Memory;
+            Assert.AreEqual(0x0, memory[0x9fff]);
+            Assert.AreEqual(0x0, memory[0x9ffe]);
+            Assert.AreEqual(0x0, memory[0x8000]);
+            Assert.AreEqual(0xdd, memory[0x7fff]);
+        }
+
+        [Test]
+        public void RunBootRom_MemoryClearLoop_After()
+        {
+            var romData = File.ReadAllBytes("DMG_ROM.bin");
+            emulator.InjectRom(romData);
+            byte[] memory = emulator.Memory;
+            Assert.AreEqual(0xdd, memory[0x9fff]);
+            Assert.AreEqual(0xdd, memory[0x9ffe]);
+            Assert.AreEqual(0xdd, memory[0x8000]);
+            Assert.AreEqual(0xdd, memory[0x7fff]);
+            //emulator.Run(8 * 1024 * 3 + 3);
+            emulator.Run(3 + 8 * 1024 * 3 + 6); // TODO: this reaches opcode 'INC C' (14 decimal) which is not implemented yet
+
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(0x16, register.PC);
+            //Assert.AreEqual(Flag.Z | Flag.H, register.F);
             Assert.AreEqual(0xfffe, register.SP);
             Assert.AreEqual(0x7fff, register.HL);
             Assert.AreEqual(0, register.A);
