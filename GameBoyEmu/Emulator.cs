@@ -193,7 +193,7 @@ namespace GameBoyEmu
                 byte nextNextByte = memory[reg.PC + 2];
                 ushort literal16Bit = (ushort)((nextNextByte << 8) + literal8Bit);
 
-                Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
+                //Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
 
                 bool isBottomHalfBlock = ((opCode >> 7) & 1) == 1; // 0 = top half of opcodes, including 8-bit load ops. 1 = bottom half of opcodes, including arithmetic ops
                 bool isQ2orQ4Block = ((opCode >> 6) & 1) == 1; // 0 = Arithmetic ops or top quarter opcodes. 1 = 8-bit load ops or bottom quarter opcodes.
@@ -398,7 +398,7 @@ namespace GameBoyEmu
                         newVal--;
 
                     // set flags register: Z 1 H C
-                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: newVal < 16 && operandVal > 0, carry: newVal > reg.A);
+                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: (newVal & 0x0f) > (reg.A & 0x0f), carry: newVal > reg.A);
 
                     reg.A = newVal;
                     break;

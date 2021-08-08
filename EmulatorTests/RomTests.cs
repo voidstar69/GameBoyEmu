@@ -163,8 +163,7 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
-            //emulator.Run(8 * 1024 * 3 + 3);
-            emulator.Run(3 + 8 * 1024 * 3 + 6); // TODO: this reaches opcode 'INC C' (14 decimal) which is not implemented yet
+            emulator.Run(3 + 8 * 1024 * 3 + 2); // TODO: this reaches opcode 'LD C,$11' (opcode 14 decimal) which is not yet implemented
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(0x16, register.PC);

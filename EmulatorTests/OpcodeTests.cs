@@ -12,12 +12,14 @@ namespace EmulatorTests
             public const byte LD_HL_d16 = (byte)OpCode.LD_HL_d16;
             public const byte LD_SP_d16 = (byte)OpCode.LD_SP_d16;
             public const byte LD_A_d8 = (byte)OpCode.LD_A_d8;
+            public const byte LD_B_A = 0x47;
             public const byte LD_HLmem_A = (byte)OpCode.LD_HLmem_A;
             public const byte LD_A_HLmem = (byte)OpCode.LD_A_HLmem;
             public const byte XOR_A = (byte)OpCode.XOR_A;
-
             public const byte ADD_A_A = 0x87;
             public const byte ADC_A_A = 0x8F;
+            public const byte SUB_B = 0x90;
+            public const byte SUB_A = 0x97;
         }
 
         private Emulator emulator;
@@ -297,7 +299,7 @@ namespace EmulatorTests
         }
 
         [Test]
-        public void ADD_A_A_and_ADC_A_A()
+        public void ADD_A_r_and_ADC_A_r()
         {
             // cause a half carry
             emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x48, Op.ADD_A_A });
@@ -330,6 +332,35 @@ namespace EmulatorTests
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0x1, register.A);
             Assert.AreEqual(Flag.None, register.F);
+        }
+
+        // TODO: also test SBC A,r
+        [Test]
+        public void SUB_r()
+        {
+            // cause a zero result
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0xab, Op.SUB_A });
+            emulator.Run(2);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(3, register.PC);
+            Assert.AreEqual(0x0, register.A);
+            Assert.AreEqual(Flag.N | Flag.Z, register.F);
+
+            // cause a carry
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x02, Op.LD_B_A, Op.LD_A_d8, 0x01, Op.SUB_B });
+            emulator.Run(4);
+            register = emulator.Registers;
+            Assert.AreEqual(6, register.PC);
+            Assert.AreEqual(0xff, register.A);
+            Assert.AreEqual(Flag.N | Flag.H | Flag.C, register.F);
+
+            // cause a half carry
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x22, Op.LD_B_A, Op.LD_A_d8, 0x51, Op.SUB_B });
+            emulator.Run(4);
+            register = emulator.Registers;
+            Assert.AreEqual(6, register.PC);
+            Assert.AreEqual(0x2f, register.A);
+            Assert.AreEqual(Flag.N | Flag.H, register.F);
         }
 
         [Test]
