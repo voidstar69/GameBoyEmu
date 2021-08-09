@@ -10,6 +10,7 @@ namespace GameBoyEmu
         LD_BC_d16 = 0x01,
         INC_C = 0x0c,
         LD_C_d8 = 0x0e,
+        LD_DE_d16 = 0x11,
         LD_HL_d16 = 0x21,
         LD_SP_d16 = 0x31,
         INC_HLmem = 0x34,   // INC (HL)
@@ -209,7 +210,7 @@ namespace GameBoyEmu
                     bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
                     int opCodeRegIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q1
 
-                    if (ExecuteOpcode_FirstQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex, literal8Bit))
+                    if (ExecuteOpcode_FirstQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex, literal8Bit, literal16Bit))
                         continue;
                 }
                 else if (isBottomHalfBlock != isQ2orQ4Block)
@@ -252,9 +253,6 @@ namespace GameBoyEmu
                     }
                     else if (ExecuteOpcode_LastQuarterOpcodes(opCode, literal8Bit))
                         continue;
-
-                    // TODO
-                    throw new NotImplementedException("Bottom quarter block operations");
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
@@ -284,7 +282,8 @@ namespace GameBoyEmu
             }
         }
 
-        private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit)
+        private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock,
+            int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
         {
             Debug.Assert(opCode >= 0x00 && opCode <= 0x3f);
             Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
@@ -293,6 +292,7 @@ namespace GameBoyEmu
             // TODO: handle other opcode families
             switch (opCodeFamily)
             {
+                // Relative jump and other opcodes
                 case 0:
                     sbyte offset = (sbyte)literal8Bit;
                     reg.PC += 2;
@@ -351,6 +351,20 @@ namespace GameBoyEmu
                         }
                     }
                     throw new NotImplementedException("Should never reach here!");
+
+                case 1:
+                    if(isRightHalfBlock)
+                    {
+                        // TODO: ADD HL,rr
+                        return false;
+                    }
+                    else
+                    {
+                        // LD rr,d16
+                        reg.Set16BitRegister(opCodeRegIndex, literal16Bit);
+                        reg.PC += 3;
+                        return true;
+                    }
 
                 // LD (reg16),A or LD A,(reg16) with mandatory post-increment or post-decrement if HL is the 16-bit register
                 case 2:
@@ -510,21 +524,6 @@ namespace GameBoyEmu
             // General instructions, handled individually rather than decoded from opcode
             switch (opCode)
             {
-                // LD BC,d16
-                case (byte)OpCode.LD_BC_d16:
-                    reg.BC = literal16Bit;
-                    break;
-
-                // LD SP,d16
-                case (byte)OpCode.LD_SP_d16:
-                    reg.SP = literal16Bit;
-                    break;
-
-                // LD HL,d16
-                case (byte)OpCode.LD_HL_d16:
-                    reg.HL = literal16Bit;
-                    break;
-
                 // LD C,d8
                 case (byte)OpCode.LD_C_d8:
                     reg.C = literal8Bit;
@@ -539,7 +538,7 @@ namespace GameBoyEmu
                     throw new ArgumentException("Invalid opcode: 0xdd");
 
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(opCode), opCode, null);
+                    throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
             }
 
             reg.PC += MiscOpCodesSize[opCode];

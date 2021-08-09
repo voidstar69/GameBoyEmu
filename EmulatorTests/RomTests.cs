@@ -152,7 +152,7 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
         }
-
+        
         [Test]
         public void RunBootRom_MemoryClearLoop_After()
         {
@@ -163,10 +163,10 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
-            emulator.Run(3 + 8 * 1024 * 3 + 12); // TODO: this reaches opcode 'LD DE,$0104' (opcode 17 decimal) which is not yet implemented
+            emulator.Run(3 + 8 * 1024 * 3 + 14);
 
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(35, register.PC);
+            Assert.AreEqual(40, register.PC);
             Assert.AreEqual(Flag.Z | Flag.H, register.F);
             //Assert.AreEqual(0xfffe, register.SP);
             //Assert.AreEqual(0xff25, register.HL);
