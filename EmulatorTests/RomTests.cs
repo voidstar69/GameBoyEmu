@@ -163,10 +163,10 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
-            emulator.Run(3 + 8 * 1024 * 3 + 14);
+            emulator.Run(3 + 8 * 1024 * 3 + 18);
 
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(40, register.PC);
+            Assert.AreEqual(0x98, register.PC);
             Assert.AreEqual(Flag.Z | Flag.H, register.F);
             //Assert.AreEqual(0xfffe, register.SP);
             //Assert.AreEqual(0xff25, register.HL);

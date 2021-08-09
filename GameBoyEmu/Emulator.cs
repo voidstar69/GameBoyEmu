@@ -19,7 +19,9 @@ namespace GameBoyEmu
         LD_HLmem_A = 0x77,  // LD (HL),A
         LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf,
+        PUSH_BC = 0xc5,
         PREFIX_CB = 0xcb,   // prefix for expanded set of another 256 bit-wise instructions
+        CALL_a16 = 0xcd,
         LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
         LD_Cmem_A = 0xe2,   // LD (C),A    aka  LD ($FF00+C),A
     }
@@ -48,6 +50,16 @@ namespace GameBoyEmu
 
         public ushort SP; // stack pointer
         public ushort PC; // program counter
+
+        public ushort AF
+        {
+            get => (ushort)((A << 8) + (byte)F);
+            set
+            {
+                A = (byte)(value >> 8);
+                F = (Flag)(value & 0xff);
+            }
+        }
 
         public ushort BC
         {
@@ -251,17 +263,36 @@ namespace GameBoyEmu
                         ExecuteOpcode_ExpandedOpcodes(expandedOpCode: literal8Bit);
                         continue;
                     }
-                    else if (ExecuteOpcode_LastQuarterOpcodes(opCode, literal8Bit))
-                        continue;
+                    else
+                    {
+                        int opCodeFamily = opCode & 0x07; // 0..7, index of column in left or right half of opcode block
+                        bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
+                        int opCodeRegIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q1
+
+                        if (ExecuteOpcode_LastQuarterOpcodes(opCode, opCodeFamily, isRightHalfBlock, opCodeRegIndex, literal8Bit, literal16Bit))
+                            continue;
+                    }
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
             }
         }
 
-        private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, byte literal8Bit)
+        private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
         {
             Debug.Assert(opCode >= 0xc0 && opCode <= 0xff);
+            Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
+            Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
+
+            // PUSH rr
+            if(opCodeFamily == 5 && !isRightHalfBlock)
+            {
+                ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
+                reg.SP -= 2;
+                memory[reg.SP] = (byte)value;
+                memory[reg.SP + 1] = (byte)(value >> 8);
+                return true;
+            }
 
             switch (opCode)
             {
@@ -277,6 +308,13 @@ namespace GameBoyEmu
                     reg.PC += 2;
                     return true;
 
+                case (byte)OpCode.CALL_a16:
+                    reg.SP -= 2;
+                    memory[reg.SP] = (byte)reg.PC;
+                    memory[reg.SP + 1] = (byte)(reg.PC >> 8);
+                    reg.PC = literal16Bit;
+                    return true;
+
                 default:
                     return false;
             }
@@ -288,6 +326,9 @@ namespace GameBoyEmu
             Debug.Assert(opCode >= 0x00 && opCode <= 0x3f);
             Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
             Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
+
+            // TODO: only needed for some opcode families
+            int reg8Index = (opCodeRegIndex << 1) + (isRightHalfBlock ? 1 : 0); // recombine 1+2 bits = 3 bits (but in opposite order)
 
             // TODO: handle other opcode families
             switch (opCodeFamily)
@@ -353,7 +394,7 @@ namespace GameBoyEmu
                     throw new NotImplementedException("Should never reach here!");
 
                 case 1:
-                    if(isRightHalfBlock)
+                    if (isRightHalfBlock)
                     {
                         // TODO: ADD HL,rr
                         return false;
@@ -388,8 +429,6 @@ namespace GameBoyEmu
 
                 // INC reg8 or INC (HL)
                 case 4:
-                    int reg8Index = (opCodeRegIndex << 1) + (isRightHalfBlock ? 1 : 0); // recombine 1+2 bits = 3 bits (but in opposite order)
-
                     // 'register' index 6 is a special case: read/write memory location indexed by HL register
                     byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
                     value++;
@@ -402,6 +441,17 @@ namespace GameBoyEmu
                     // set flags register: Z 0 H -
                     reg.SetFlags(zero: value == 0, subtract: false, halfCarry: value == 16, carry: (reg.F & Flag.C) != 0);
                     reg.PC += 1;
+                    return true;
+
+                // LD r,d8 or LD (HL),d8
+                case 6:
+                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                    if (reg8Index == 6)
+                        memory[reg.HL] = literal8Bit;
+                    else
+                        reg.Set8BitRegister(reg8Index, literal8Bit);
+
+                    reg.PC += 2;
                     return true;
 
                 // TODO: make default case throw exception once all cases are accounted for?
@@ -524,11 +574,6 @@ namespace GameBoyEmu
             // General instructions, handled individually rather than decoded from opcode
             switch (opCode)
             {
-                // LD C,d8
-                case (byte)OpCode.LD_C_d8:
-                    reg.C = literal8Bit;
-                    break;
-
                 // LD A,d8
                 case (byte)OpCode.LD_A_d8:
                     reg.A = literal8Bit;
