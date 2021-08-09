@@ -9,6 +9,7 @@ namespace GameBoyEmu
         NOP = 0x00,
         LD_BC_d16 = 0x01,
         INC_C = 0x0c,
+        LD_C_d8 = 0x0e,
         LD_HL_d16 = 0x21,
         LD_SP_d16 = 0x31,
         INC_HLmem = 0x34,   // INC (HL)
@@ -17,7 +18,9 @@ namespace GameBoyEmu
         LD_HLmem_A = 0x77,  // LD (HL),A
         LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf,
-        PREFIX_CB = 0xCB    // prefix for expanded set of another 256 bit-wise instructions
+        PREFIX_CB = 0xcb,   // prefix for expanded set of another 256 bit-wise instructions
+        LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
+        LD_Cmem_A = 0xe2,   // LD (C),A    aka  LD ($FF00+C),A
     }
 
     [Flags]
@@ -160,9 +163,9 @@ namespace GameBoyEmu
             // other higher opcodes have hardcoded sizes
         };
 
-        // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff
+        // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff, and writes to 0xff26 to "setup audio".
         // TODO: Later on map some high memory accesses directly to VRAM instead of system memory.
-        private readonly byte[] memory = new byte[0xa000];
+        private readonly byte[] memory = new byte[0xffff];
 
         // registers
         private RegisterSet reg;
@@ -247,12 +250,37 @@ namespace GameBoyEmu
                         ExecuteOpcode_ExpandedOpcodes(expandedOpCode: literal8Bit);
                         continue;
                     }
+                    else if (ExecuteOpcode_LastQuarterOpcodes(opCode, literal8Bit))
+                        continue;
 
                     // TODO
                     throw new NotImplementedException("Bottom quarter block operations");
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
+            }
+        }
+
+        private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, byte literal8Bit)
+        {
+            Debug.Assert(opCode >= 0xc0 && opCode <= 0xff);
+
+            switch (opCode)
+            {
+                // LDH (a8),A  aka  LD ($FF00+a8),A
+                case (byte)OpCode.LDH_a8_A:
+                    memory[0xFF00 + literal8Bit] = reg.A;
+                    reg.PC += 2;
+                    return true;
+
+                // LD (C),A  aka  LD ($FF00+C),A
+                case (byte)OpCode.LD_Cmem_A:
+                    memory[0xFF00 + reg.C] = reg.A;
+                    reg.PC += 2;
+                    return true;
+
+                default:
+                    return false;
             }
         }
 
@@ -495,6 +523,11 @@ namespace GameBoyEmu
                 // LD HL,d16
                 case (byte)OpCode.LD_HL_d16:
                     reg.HL = literal16Bit;
+                    break;
+
+                // LD C,d8
+                case (byte)OpCode.LD_C_d8:
+                    reg.C = literal8Bit;
                     break;
 
                 // LD A,d8

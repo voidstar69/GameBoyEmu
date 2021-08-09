@@ -167,6 +167,21 @@ namespace EmulatorTests
         }
 
         [Test]
+        public void LD_C_d8()
+        {
+            emulator.InjectRom(new byte[] { (byte)OpCode.LD_C_d8, 0xbc });
+            emulator.Run(1);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(2, register.PC);
+            Assert.AreEqual(0xbc, register.C);
+            Assert.AreEqual(0, register.A);
+            Assert.AreEqual(0, register.B);
+            Assert.AreEqual(0, register.DE);
+            Assert.AreEqual(0, register.HL);
+            Assert.AreEqual(0, register.SP);
+        }
+
+        [Test]
         public void Load_8bit_register_from_register()
         {
             emulator.InjectRom(new byte[] { Op.LD_A_d8, 0xbc, 0x57, 0x6a }); // LD A,d8 | LD D,A | LD L,D
