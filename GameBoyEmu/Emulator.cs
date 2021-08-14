@@ -202,8 +202,14 @@ namespace GameBoyEmu
 
         public void Run(int numInstructions = -1)
         {
+            ushort previousPC = 1000;
+
             while (numInstructions-- != 0)
             {
+                if(reg.PC == previousPC)
+                    throw new InvalidOperationException("Opcode did not increase PC!");
+                previousPC = reg.PC;
+
                 byte opCode = memory[reg.PC];
                 byte literal8Bit = memory[reg.PC + 1];
                 byte nextNextByte = memory[reg.PC + 2];
@@ -291,6 +297,7 @@ namespace GameBoyEmu
                 reg.SP -= 2;
                 memory[reg.SP] = (byte)value;
                 memory[reg.SP + 1] = (byte)(value >> 8);
+                reg.PC++;
                 return true;
             }
 
