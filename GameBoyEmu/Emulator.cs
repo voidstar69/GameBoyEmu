@@ -463,7 +463,23 @@ namespace GameBoyEmu
                         reg.Set8BitRegister(reg8Index, value);
 
                     // set flags register: Z 0 H -
-                    reg.SetFlags(zero: value == 0, subtract: false, halfCarry: value == 16, carry: (reg.F & Flag.C) != 0);
+                    reg.SetFlags(zero: value == 0, subtract: false, halfCarry: (value & 0x0f) == 0, carry: (reg.F & Flag.C) != 0);
+                    reg.PC += 1;
+                    return true;
+
+                // DEC reg8 or DEC (HL)
+                case 5:
+                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                    value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                    value--;
+
+                    if (reg8Index == 6)
+                        memory[reg.HL] = value;
+                    else
+                        reg.Set8BitRegister(reg8Index, value);
+
+                    // set flags register: Z 1 H -
+                    reg.SetFlags(zero: value == 0, subtract: true, halfCarry: (value & 0x0f) == 0x0f, carry: (reg.F & Flag.C) != 0);
                     reg.PC += 1;
                     return true;
 

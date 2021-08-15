@@ -154,7 +154,7 @@ namespace EmulatorTests
         }
         
         [Test]
-        public void RunBootRom_MemoryClearLoop_After()
+        public void RunBootRom_Run_Partial()
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
@@ -163,10 +163,10 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
-            emulator.Run(3 + 8 * 1024 * 3 + 21);
+            emulator.Run(3 + 8 * 1024 * 3 + 33 + 100); // TODO: opcode 35 not implemented - 'INC HL'
 
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(0x9d, register.PC);
+            Assert.AreEqual(0xa1, register.PC);
             //Assert.AreEqual(Flag.Z | Flag.H, register.F);
             //Assert.AreEqual(0xfffe, register.SP);
             //Assert.AreEqual(0xff25, register.HL);

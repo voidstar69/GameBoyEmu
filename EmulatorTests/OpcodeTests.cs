@@ -99,7 +99,7 @@ namespace EmulatorTests
             register = emulator.Registers;
             Assert.AreEqual(4, register.PC);
             Assert.AreEqual(0x4, register.HL);
-            Assert.AreEqual(Flag.Z, register.F);
+            Assert.AreEqual(Flag.Z | Flag.H, register.F);
             memory = emulator.Memory;
             Assert.AreEqual(0x00, memory[4]);
             Assert.AreEqual(0, register.A);
