@@ -302,6 +302,22 @@ namespace GameBoyEmu
                 return true;
             }
 
+            // POP rr
+            if(opCodeFamily == 1 && !isRightHalfBlock)
+            {
+                ushort value = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                reg.SP += 2;
+
+                // 4th row is AF instead of SP
+                if(opCodeRegIndex == 3)
+                    reg.AF = value;
+                else
+                    reg.Set16BitRegister(opCodeRegIndex, value);
+
+                reg.PC++;
+                return true;
+            }
+
             switch (opCode)
             {
                 // LDH (a8),A  aka  LD ($FF00+a8),A
