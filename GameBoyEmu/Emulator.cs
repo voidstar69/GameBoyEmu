@@ -11,6 +11,7 @@ namespace GameBoyEmu
         INC_C = 0x0c,
         LD_C_d8 = 0x0e,
         LD_DE_d16 = 0x11,
+        RLA = 0x17,         // rotate A left through carry
         LD_HL_d16 = 0x21,
         LD_SP_d16 = 0x31,
         INC_HLmem = 0x34,   // INC (HL)
@@ -559,9 +560,9 @@ namespace GameBoyEmu
         {
             reg.PC += 2;
 
-            // BIT 7,H
             if (expandedOpCode == 0x7C)
             {
+                // BIT 7,H
                 const int bitPosition = 7;
 
                 // test bit 7 (the highest bit)
@@ -570,8 +571,29 @@ namespace GameBoyEmu
                 // set flags register: Z 0 1 -
                 reg.SetFlags(zero: bitNotSet, subtract: false, halfCarry: true, carry: (reg.F & Flag.C) != 0);
             }
+            else if (expandedOpCode == 0x01)
+            {
+                // RLC C - rotate left
+                byte oldVal = reg.C;
+                reg.C = (byte)((oldVal << 1) | (oldVal >> 7));
+
+                // set flags register: Z 0 0 C
+                // TODO: guessing how to set carry flag
+                reg.SetFlags(zero: reg.C == 0, subtract: false, halfCarry: false, carry: (oldVal & 0x80) != 0);
+            }
+            else if (expandedOpCode == 0x11)
+            {
+                // RL C - rotate left through carry
+                // TODO: guessing how to use carry flag to add a bit to register
+                byte oldVal = reg.C;
+                reg.C = (byte)((oldVal << 1) | ((reg.F & Flag.C) != 0 ? 1 : 0));
+
+                // set flags register: Z 0 0 C
+                // TODO: guessing how to set carry flag
+                reg.SetFlags(zero: reg.C == 0, subtract: false, halfCarry: false, carry: (oldVal & 0x80) != 0);
+            }
             else
-                throw new NotImplementedException("Some arithmetic operations not yet implemented");
+                throw new NotImplementedException("Some CB expanded opcodes not yet implemented: " + expandedOpCode);
         }
 
         private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit, ushort literal16Bit)
@@ -584,6 +606,17 @@ namespace GameBoyEmu
                 // LD A,d8
                 case (byte)OpCode.LD_A_d8:
                     reg.A = literal8Bit;
+                    break;
+
+                case (byte)OpCode.RLA:
+                    // RLA - rotate A left through carry
+                    // TODO: guessing how to use carry flag to add a bit to register
+                    byte oldVal = reg.A;
+                    reg.A = (byte)((oldVal << 1) | ((reg.F & Flag.C) != 0 ? 1 : 0));
+
+                    // set flags register: 0 0 0 C
+                    // TODO: guessing how to set carry flag
+                    reg.SetFlags(zero: false, subtract: false, halfCarry: false, carry: (oldVal & 0x80) != 0);
                     break;
 
                 case InvalidOpCode1:
