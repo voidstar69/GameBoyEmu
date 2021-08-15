@@ -21,6 +21,7 @@ namespace GameBoyEmu
         LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf,
         PUSH_BC = 0xc5,
+        RET = 0xc9,         // return from a CALL
         PREFIX_CB = 0xcb,   // prefix for expanded set of another 256 bit-wise instructions
         CALL_a16 = 0xcd,
         LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
@@ -285,65 +286,6 @@ namespace GameBoyEmu
             }
         }
 
-        private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
-        {
-            Debug.Assert(opCode >= 0xc0 && opCode <= 0xff);
-            Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
-            Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
-
-            // PUSH rr
-            if(opCodeFamily == 5 && !isRightHalfBlock)
-            {
-                ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
-                reg.SP -= 2;
-                memory[reg.SP] = (byte)value;
-                memory[reg.SP + 1] = (byte)(value >> 8);
-                reg.PC++;
-                return true;
-            }
-
-            // POP rr
-            if(opCodeFamily == 1 && !isRightHalfBlock)
-            {
-                ushort value = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
-                reg.SP += 2;
-
-                // 4th row is AF instead of SP
-                if(opCodeRegIndex == 3)
-                    reg.AF = value;
-                else
-                    reg.Set16BitRegister(opCodeRegIndex, value);
-
-                reg.PC++;
-                return true;
-            }
-
-            switch (opCode)
-            {
-                // LDH (a8),A  aka  LD ($FF00+a8),A
-                case (byte)OpCode.LDH_a8_A:
-                    memory[0xFF00 + literal8Bit] = reg.A;
-                    reg.PC += 2;
-                    return true;
-
-                // LD (C),A  aka  LD ($FF00+C),A
-                case (byte)OpCode.LD_Cmem_A:
-                    memory[0xFF00 + reg.C] = reg.A;
-                    reg.PC += 2;
-                    return true;
-
-                case (byte)OpCode.CALL_a16:
-                    reg.SP -= 2;
-                    memory[reg.SP] = (byte)reg.PC;
-                    memory[reg.SP + 1] = (byte)(reg.PC >> 8);
-                    reg.PC = literal16Bit;
-                    return true;
-
-                default:
-                    return false;
-            }
-        }
-
         private bool ExecuteOpcode_FirstQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock,
             int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
         {
@@ -450,6 +392,23 @@ namespace GameBoyEmu
 
                     reg.PC += 1;
                     return true;
+
+                // INC reg16 or DEC reg16
+                case 3:
+                    if (isRightHalfBlock)
+                    {
+                        // DEC reg16
+                        reg.Set16BitRegister(opCodeRegIndex, (ushort)(reg.Get16BitRegister(opCodeRegIndex) - 1));
+                        reg.PC++;
+                        return true;
+                    }
+                    else
+                    {
+                        // INC reg16
+                        reg.Set16BitRegister(opCodeRegIndex, (ushort)(reg.Get16BitRegister(opCodeRegIndex) + 1));
+                        reg.PC++;
+                        return true;
+                    }
 
                 // INC reg8 or INC (HL)
                 case 4:
@@ -562,6 +521,71 @@ namespace GameBoyEmu
             }
 
             reg.PC++;
+        }
+
+        private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
+        {
+            Debug.Assert(opCode >= 0xc0 && opCode <= 0xff);
+            Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
+            Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
+
+            // PUSH rr
+            if(opCodeFamily == 5 && !isRightHalfBlock)
+            {
+                ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
+                reg.SP -= 2;
+                memory[reg.SP] = (byte)value;
+                memory[reg.SP + 1] = (byte)(value >> 8);
+                reg.PC++;
+                return true;
+            }
+
+            // POP rr
+            if(opCodeFamily == 1 && !isRightHalfBlock)
+            {
+                ushort value = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                reg.SP += 2;
+
+                // 4th row is AF instead of SP
+                if(opCodeRegIndex == 3)
+                    reg.AF = value;
+                else
+                    reg.Set16BitRegister(opCodeRegIndex, value);
+
+                reg.PC++;
+                return true;
+            }
+
+            switch (opCode)
+            {
+                // LDH (a8),A  aka  LD ($FF00+a8),A
+                case (byte)OpCode.LDH_a8_A:
+                    memory[0xFF00 + literal8Bit] = reg.A;
+                    reg.PC += 2;
+                    return true;
+
+                // LD (C),A  aka  LD ($FF00+C),A
+                case (byte)OpCode.LD_Cmem_A:
+                    memory[0xFF00 + reg.C] = reg.A;
+                    reg.PC += 2;
+                    return true;
+
+                case (byte)OpCode.CALL_a16:
+                    reg.PC += 3;
+                    reg.SP -= 2;
+                    memory[reg.SP] = (byte)reg.PC;
+                    memory[reg.SP + 1] = (byte)(reg.PC >> 8);
+                    reg.PC = literal16Bit;
+                    return true;
+
+                case (byte)OpCode.RET:
+                    reg.PC = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                    reg.SP += 2;
+                    return true;
+
+                default:
+                    return false;
+            }
         }
 
         // 8-bit load operation from register or memory, but not from 8-bit literal
