@@ -26,6 +26,7 @@ namespace GameBoyEmu
         CALL_a16 = 0xcd,
         LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
         LD_Cmem_A = 0xe2,   // LD (C),A    aka  LD ($FF00+C),A
+        CP_d8 = 0xfe        // compare (A - d8), set flags without storing result
     }
 
     [Flags]
@@ -282,7 +283,7 @@ namespace GameBoyEmu
                     }
                 }
 
-                ExecuteOpcode_Misc(opCode, literal8Bit, literal16Bit);
+                ExecuteOpcode_Misc(opCode, literal8Bit);
             }
         }
 
@@ -583,6 +584,15 @@ namespace GameBoyEmu
                     reg.SP += 2;
                     return true;
 
+                case (byte)OpCode.CP_d8:
+                    byte newVal = (byte)(reg.A - literal8Bit);
+
+                    // set flags register: Z 1 H C
+                    reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: (newVal & 0x0f) > (reg.A & 0x0f), carry: newVal > reg.A);
+
+                    reg.PC += 2;
+                    return true;
+
                 default:
                     return false;
             }
@@ -652,7 +662,7 @@ namespace GameBoyEmu
                 throw new NotImplementedException("Some CB expanded opcodes not yet implemented: " + expandedOpCode);
         }
 
-        private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit, ushort literal16Bit)
+        private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit)
         {
             Debug.Assert(opCode >= 0x00 && opCode <= 0xff);
 

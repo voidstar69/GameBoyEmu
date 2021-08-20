@@ -378,6 +378,35 @@ namespace EmulatorTests
             Assert.AreEqual(Flag.N | Flag.H, register.F);
         }
 
+        // compare A - n, i.e. subtract n from A and set flags, but without storing the result
+        [Test]
+        public void CP_d8()
+        {
+            // cause a zero result
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0xab, (byte)OpCode.CP_d8, 0xab });
+            emulator.Run(2);
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0xab, register.A);
+            Assert.AreEqual(Flag.N | Flag.Z, register.F);
+
+            // cause a carry
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x01, (byte)OpCode.CP_d8, 0x02 });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0x01, register.A);
+            Assert.AreEqual(Flag.N | Flag.H | Flag.C, register.F);
+
+            // cause a half carry
+            emulator.InjectRom(new byte[] { Op.LD_A_d8, 0x51, (byte)OpCode.CP_d8, 0x22 });
+            emulator.Run(2);
+            register = emulator.Registers;
+            Assert.AreEqual(4, register.PC);
+            Assert.AreEqual(0x51, register.A);
+            Assert.AreEqual(Flag.N | Flag.H, register.F);
+        }
+
         [Test]
         public void XOR_A()
         {
