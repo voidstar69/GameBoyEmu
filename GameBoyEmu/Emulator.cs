@@ -26,7 +26,9 @@ namespace GameBoyEmu
         CALL_a16 = 0xcd,
         LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
         LD_Cmem_A = 0xe2,   // LD (C),A    aka  LD ($FF00+C),A
-        CP_d8 = 0xfe        // compare (A - d8), set flags without storing result
+        CP_d8 = 0xfe,       // compare (A - d8), set flags without storing result
+        LD_a16_A = 0xea,    // LD (a16),A
+        LDH_A_a8 = 0xf0,    // LDH A,(a8)
     }
 
     [Flags]
@@ -251,8 +253,8 @@ namespace GameBoyEmu
                         bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
                         int opCodeRowIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q3
 
-                        ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex);
-                        continue;
+                        if(ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex))
+                            continue;
                     }
                     else
                     {
@@ -461,7 +463,7 @@ namespace GameBoyEmu
         }
 
         // Some arithmetic opcodes are outside the scope of this method
-        private void ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index, bool isRightHalfBlock, int opCodeRowIndex)
+        private bool ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index, bool isRightHalfBlock, int opCodeRowIndex)
         {
             Debug.Assert(opCode >= 0x80 && opCode <= 0xbf);
 
@@ -518,10 +520,12 @@ namespace GameBoyEmu
                 //    break;
 
                 default:
-                    throw new NotImplementedException("Some arithmetic operations not yet implemented");
+                    return false;
+                    //throw new NotImplementedException("Some arithmetic operations not yet implemented");
             }
 
             reg.PC++;
+            return true;
         }
 
         private bool ExecuteOpcode_LastQuarterOpcodes(byte opCode, int opCodeFamily, bool isRightHalfBlock, int opCodeRegIndex, byte literal8Bit, ushort literal16Bit)
@@ -563,6 +567,18 @@ namespace GameBoyEmu
                 case (byte)OpCode.LDH_a8_A:
                     memory[0xFF00 + literal8Bit] = reg.A;
                     reg.PC += 2;
+                    return true;
+
+                // LDH A,(a8)  aka  LD A,($FF00+a8)
+                case (byte)OpCode.LDH_A_a8:
+                    reg.A = memory[0xFF00 + literal8Bit];
+                    reg.PC += 2;
+                    return true;
+
+                // LD (a16),A
+                case (byte)OpCode.LD_a16_A:
+                    memory[literal16Bit] = reg.A;
+                    reg.PC += 3;
                     return true;
 
                 // LD (C),A  aka  LD ($FF00+C),A
