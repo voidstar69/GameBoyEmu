@@ -188,19 +188,27 @@ namespace GameBoyEmu
         // registers
         private RegisterSet reg;
 
+        private static readonly byte[] emptyRom = new byte[0];
+
         public Emulator()
         {
-            InjectRom(new byte[] { });
+            InjectRom(emptyRom, emptyRom);
         }
 
-        public void InjectRom(byte[] romData)
+        public void InjectRom(byte[] bootRomData)
+        {
+            InjectRom(bootRomData, emptyRom);
+        }
+
+        public void InjectRom(byte[] bootRomData, byte[] cartRomData)
         {
             //Array.Clear(memory, 0, memory.Length);
 
-            for (int i = romData.Length; i < memory.Length; i++)
+            for (int i = Math.Max(bootRomData.Length, cartRomData.Length); i < memory.Length; i++)
                 memory[i] = DefaultMemoryByteValue;
 
-            Array.Copy(romData, memory, romData.Length);
+            Array.Copy(cartRomData, memory, cartRomData.Length);
+            Array.Copy(bootRomData, memory, bootRomData.Length);
 
             reg.PC = 0;
         }

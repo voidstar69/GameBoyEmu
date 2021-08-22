@@ -154,7 +154,7 @@ namespace EmulatorTests
         }
         
         [Test]
-        public void RunBootRom_Run_Partial()
+        public void RunBootRom_UntilLogoCheck()
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
@@ -166,10 +166,36 @@ namespace EmulatorTests
 
             memory[0xff44] = 0x90; // value expected when Boot ROM is waiting for screen frame
 
-            emulator.Run(47443); // TODO: infinite loop in Boot ROM because logo data in cart does not match DMG ROM
+            emulator.Run(47442); // stop just before opcode which causes infinite loop in Boot ROM because logo data in cart does not match DMG ROM
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(0xe9, register.PC);
+
+            memory = emulator.Memory;
+            Assert.AreEqual(0x0, memory[0x9fff]);
+            Assert.AreEqual(0x0, memory[0x9ffe]);
+            Assert.AreEqual(0x0, memory[0x8000]);
+            Assert.AreEqual(0xdd, memory[0x7fff]);
+        }
+
+        [Test]
+        public void RunBootRomAndCartRom()
+        {
+            var bootRomData = File.ReadAllBytes("DMG_ROM.bin");
+            var cartRomData = File.ReadAllBytes("2048.gb.bin");
+            emulator.InjectRom(bootRomData, cartRomData);
+            byte[] memory = emulator.Memory;
+            //Assert.AreEqual(0xdd, memory[0x9fff]);
+            //Assert.AreEqual(0xdd, memory[0x9ffe]);
+            //Assert.AreEqual(0xdd, memory[0x8000]);
+            //Assert.AreEqual(0xdd, memory[0x7fff]);
+
+            memory[0xff44] = 0x90; // value expected when Boot ROM is waiting for screen frame
+
+            emulator.Run(47443 + 1000); // TODO: opcode 195 / C3 'JP a16' not implemented at PC=257 / 0x101
+
+            RegisterSet register = emulator.Registers;
+            Assert.AreEqual(0xec, register.PC);
 
             memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0x9fff]);
