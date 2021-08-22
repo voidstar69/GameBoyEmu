@@ -212,7 +212,7 @@ namespace GameBoyEmu
             while (numInstructions-- != 0)
             {
                 if(reg.PC == previousPC)
-                    throw new InvalidOperationException("Opcode did not increase PC!");
+                    throw new InvalidOperationException("Opcode did not increase PC. Emulator bug or ROM infinite loop!");
                 previousPC = reg.PC;
 
                 byte opCode = memory[reg.PC];
@@ -466,6 +466,8 @@ namespace GameBoyEmu
         private bool ExecuteOpcode_Arithmetic_Main(byte opCode, int srcReg8Index, bool isRightHalfBlock, int opCodeRowIndex)
         {
             Debug.Assert(opCode >= 0x80 && opCode <= 0xbf);
+            Debug.Assert(0 <= srcReg8Index && srcReg8Index <= 7);
+            Debug.Assert(0 <= opCodeRowIndex && opCodeRowIndex <= 3);
 
             // 'register' index 6 is a special case: read/write memory location indexed by HL register
             byte operandVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
@@ -516,8 +518,23 @@ namespace GameBoyEmu
                 // TODO: handle other opcode families
 
                 // OR / CP
-                //case 3:
-                //    break;
+                case 3:
+                    if(isRightHalfBlock)
+                    {
+                        // CP r8 or CP (HL)
+                        newVal = (byte)(reg.A - operandVal);
+
+                        // set flags register: Z 1 H C
+                        reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: (newVal & 0x0f) > (reg.A & 0x0f), carry: newVal > reg.A);
+
+                        reg.PC++;
+                        return true;
+                    }
+                    else
+                    {
+                        // OR
+                        return false;
+                    }
 
                 default:
                     return false;
@@ -619,6 +636,7 @@ namespace GameBoyEmu
         private void ExecuteOpcode_LoadRegOrMem_Main(byte opCode, int srcReg8Index)
         {
             Debug.Assert(opCode >= 0x40 && opCode <= 0x7f);
+            Debug.Assert(0 <= srcReg8Index && srcReg8Index <= 7);
 
             int destReg8Index = (opCode >> 3) & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
 
@@ -680,8 +698,6 @@ namespace GameBoyEmu
 
         private void ExecuteOpcode_Misc(byte opCode, byte literal8Bit)
         {
-            Debug.Assert(opCode >= 0x00 && opCode <= 0xff);
-
             // General instructions, handled individually rather than decoded from opcode
             switch (opCode)
             {

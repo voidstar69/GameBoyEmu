@@ -166,20 +166,10 @@ namespace EmulatorTests
 
             memory[0xff44] = 0x90; // value expected when Boot ROM is waiting for screen frame
 
-            emulator.Run(28676 + 100000); // TODO: opcode 190 not implemented - 'CP (HL)'
+            emulator.Run(47443); // TODO: infinite loop in Boot ROM because logo data in cart does not match DMG ROM
 
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(100, register.PC);
-            //Assert.AreEqual(Flag.Z | Flag.H, register.F);
-            //Assert.AreEqual(0xfffe, register.SP);
-            //Assert.AreEqual(0xff25, register.HL);
-            //Assert.AreEqual(0x80, register.A);
-            //Assert.AreEqual(0x11, register.BC);
-            //Assert.AreEqual(0, register.B);
-            //Assert.AreEqual(0x11, register.C);
-            //Assert.AreEqual(0, register.DE);
-            //Assert.AreEqual(0, register.D);
-            //Assert.AreEqual(0, register.E);
+            Assert.AreEqual(0xe9, register.PC);
 
             memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0x9fff]);
