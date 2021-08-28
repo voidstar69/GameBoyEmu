@@ -178,7 +178,21 @@ namespace GameBoyEmu
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 2x
             2,3,1,1,1,1,2,1,2,1,1,1,1,1,2,1, // 3x
 
-            // other higher opcodes have hardcoded sizes
+            // some higher opcodes have hardcoded sizes, and do not depend on this table
+
+            // TODO: zero values have not been filled in yet
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 4x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 5x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 6x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 7x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 8x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // 9x
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // ax
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // bx
+            0,0,0,3,0,0,0,0,0,0,0,0,3,0,2,0, // cx
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // dx
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // ex
+            0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // fx
         };
 
         // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff, and writes to 0xff26 to "setup audio".
@@ -219,16 +233,13 @@ namespace GameBoyEmu
 
             while (numInstructions-- != 0)
             {
-                if(reg.PC == previousPC)
-                    throw new InvalidOperationException("Opcode did not increase PC. Emulator bug or ROM infinite loop!");
-                previousPC = reg.PC;
-
                 byte opCode = memory[reg.PC];
                 byte literal8Bit = memory[reg.PC + 1];
                 byte nextNextByte = memory[reg.PC + 2];
                 ushort literal16Bit = (ushort)((nextNextByte << 8) + literal8Bit);
 
                 //Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
+                Console.Write(",{0}:{1:x}", reg.PC, opCode);
 
                 bool isBottomHalfBlock = ((opCode >> 7) & 1) == 1; // 0 = top half of opcodes, including 8-bit load ops. 1 = bottom half of opcodes, including arithmetic ops
                 bool isQ2orQ4Block = ((opCode >> 6) & 1) == 1; // 0 = Arithmetic ops or top quarter opcodes. 1 = 8-bit load ops or bottom quarter opcodes.
@@ -261,7 +272,7 @@ namespace GameBoyEmu
                         bool isRightHalfBlock = ((opCode >> 3) & 0x01) == 1; // 0 = left half of opcodes. 1 = right half of opcodes.
                         int opCodeRowIndex = (opCode >> 4) & 0x03; // 0..3, index of row in opcode block Q3
 
-                        if(ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex))
+                        if (ExecuteOpcode_Arithmetic_Main(opCode, srcReg8Index, isRightHalfBlock, opCodeRowIndex))
                             continue;
                     }
                     else
@@ -294,6 +305,10 @@ namespace GameBoyEmu
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit);
+
+                if (reg.PC == previousPC)
+                    throw new InvalidOperationException($"Opcode ({opCode}) did not increase PC ({reg.PC}). Emulator bug or ROM infinite loop!");
+                previousPC = reg.PC;
             }
         }
 
@@ -319,7 +334,9 @@ namespace GameBoyEmu
                         switch (opCodeRegIndex)
                         {
                             // TODO: implement 'LD (a16),SP'. 3 byte instruction.
-                            case 0: throw new NotImplementedException("LD (a16),SP");
+                            case 0:
+                                return false;
+                            //throw new NotImplementedException("LD (a16),SP");
 
                             // Jump Relative
 
@@ -527,7 +544,7 @@ namespace GameBoyEmu
 
                 // OR / CP
                 case 3:
-                    if(isRightHalfBlock)
+                    if (isRightHalfBlock)
                     {
                         // CP r8 or CP (HL)
                         newVal = (byte)(reg.A - operandVal);
@@ -559,29 +576,60 @@ namespace GameBoyEmu
             Debug.Assert(opCodeFamily >= 0 && opCodeFamily <= 7);
             Debug.Assert(opCodeRegIndex >= 0 && opCodeRegIndex <= 3);
 
-            // PUSH rr
-            if(opCodeFamily == 5 && !isRightHalfBlock)
-            {
-                ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
-                reg.SP -= 2;
-                memory[reg.SP] = (byte)value;
-                memory[reg.SP + 1] = (byte)(value >> 8);
-                reg.PC++;
-                return true;
-            }
-
             // POP rr
-            if(opCodeFamily == 1 && !isRightHalfBlock)
+            if (opCodeFamily == 1 && !isRightHalfBlock)
             {
                 ushort value = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
                 reg.SP += 2;
 
                 // 4th row is AF instead of SP
-                if(opCodeRegIndex == 3)
+                if (opCodeRegIndex == 3)
                     reg.AF = value;
                 else
                     reg.Set16BitRegister(opCodeRegIndex, value);
 
+                reg.PC++;
+                return true;
+            }
+
+            // CALL f,a16
+            if (opCodeFamily == 4)
+            {
+                reg.PC += 3;
+                Flag flagBitToBranch = (Flag)(isRightHalfBlock ? 1 : 0);
+
+                switch (opCodeRegIndex)
+                {
+                    // CALL NZ,a16 / CALL Z,a16
+                    case 0:
+                        if ((reg.F & Flag.Z) != flagBitToBranch) return true; // no branch, move to next opcode
+                        break;
+
+                    // CALL NC,a16 / CALL C,a16
+                    case 1:
+                        if ((reg.F & Flag.C) != flagBitToBranch) return true; // no branch, move to next opcode
+                        break;
+
+                    // Invalid opcodes - the real machine crashes here!
+                    default:
+                        throw new ArgumentException($"Invalid opcode {opCode} at PC=" + reg.PC);
+                }
+
+                // push next opcode in sequence onto stack, and branch to 16-bit address
+                reg.SP -= 2;
+                memory[reg.SP] = (byte)reg.PC;
+                memory[reg.SP + 1] = (byte)(reg.PC >> 8);
+                reg.PC = literal16Bit;
+                return true;
+            }
+
+            // PUSH rr
+            if (opCodeFamily == 5 && !isRightHalfBlock)
+            {
+                ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
+                reg.SP -= 2;
+                memory[reg.SP] = (byte)value;
+                memory[reg.SP + 1] = (byte)(value >> 8);
                 reg.PC++;
                 return true;
             }
@@ -726,10 +774,14 @@ namespace GameBoyEmu
                     break;
 
                 case InvalidOpCode1:
-                    throw new ArgumentException("Invalid opcode: 0xdd");
+                    throw new ArgumentException("Invalid opcode 0xdd at PC=" + reg.PC);
 
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
+                    // TODO: experiment to skip over known but unimplemented opcodes
+                    if (opCode >= MiscOpCodesSize.Length)
+                        throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
+                    Console.Write('*');
+                    break;
             }
 
             reg.PC += MiscOpCodesSize[opCode];
