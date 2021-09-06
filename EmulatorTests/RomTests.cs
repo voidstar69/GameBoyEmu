@@ -154,7 +154,7 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x7fff]);
         }
         
-        [Test, Timeout(150)]
+        [Test, Timeout(200)]
         public void RunBootRom_UntilLogoCheck()
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
@@ -164,6 +164,9 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
+
+            //var memoryData = memory.GetMemoryClone();
+            //File.WriteAllBytes("memory1.bin", memoryData);
 
             emulator.Run(47442); // stop just before opcode which causes infinite loop in Boot ROM because logo data in cart does not match DMG ROM
 
@@ -175,6 +178,12 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, memory[0x9ffe]);
             Assert.AreEqual(0x0, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
+
+            //memoryData = memory.GetMemoryClone();
+            //File.WriteAllBytes("memory2.bin", memoryData);
+
+            //var tileMap = memory.GetTileMap1D();
+            //File.WriteAllBytes("tilemap.bin", tileMap);
         }
 
         [Test, Timeout(200)]
@@ -189,7 +198,7 @@ namespace EmulatorTests
             Assert.AreEqual(0xdd, memory[0x8000]);
             Assert.AreEqual(0x0, memory[0x7fff]);
 
-            emulator.Run(47443 + 1000); // TODO: Invalid opcode at PC=783. Actual value was 230. "AND d8"
+            emulator.Run(47443 + 515); // TODO: Invalid opcode at PC=783. Actual value was 230. "AND d8"
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(779, register.PC);
@@ -199,6 +208,9 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, memory[0x9ffe]);
             Assert.AreEqual(0x0, memory[0x8000]);
             Assert.AreEqual(0x0, memory[0x7fff]);
+
+            //var tileMap = memory.GetTileMap1D();
+            //File.WriteAllBytes("tilemap.bin", tileMap);
         }
     }
 }

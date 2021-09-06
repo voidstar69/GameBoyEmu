@@ -28,10 +28,104 @@ namespace GameBoyEmu
             UpdateLcdYCoordinate(0x90);
         }
 
+        public byte[] GetMemoryClone()
+        {
+            return (byte[])memory.Clone();
+        }
+
+        public byte[,] GetTileMap2D()
+        {
+            const int tileMapSize = 32;
+            byte[,] tileMap = new byte[tileMapSize, tileMapSize];
+            int tileMapAddr = ReadLcdControlRegister().HasFlag(LcdControlFlags.BackgroundTileMapArea) ? 0x9c00 : 0x9800;
+            for (int row = 0; row < tileMapSize; row++)
+            {
+                for (int col = 0; col < tileMapSize; col++)
+                {
+                    tileMap[col, row] = memory[tileMapAddr++];
+                }
+            }
+            return tileMap;
+        }
+
+        public byte[] GetTileMap1D()
+        {
+            int tileMapAddr = ReadLcdControlRegister().HasFlag(LcdControlFlags.BackgroundTileMapArea) ? 0x9c00 : 0x9800;
+            byte[] tileMap = new byte[32 * 32];
+            Array.Copy(memory, tileMapAddr, tileMap, 0, tileMap.Length);
+            return tileMap;
+        }
+
+        public byte[] GetObjTileData()
+        {
+            const int tileDataAddr = 0x8800;
+            byte[] tileData = new byte[256 * 16];
+            Array.Copy(memory, tileDataAddr, tileData, 0, tileData.Length);
+            return tileData;
+        }
+
+        public byte[] GetBackgroundAndWindowTileData()
+        {
+            int tileDataBlock1Addr = ReadLcdControlRegister().HasFlag(LcdControlFlags.BackgroundAndWindowTileDataArea) ? 0x8000 : 0x9000;
+            const int tileDataBlock2Addr = 0x8800;
+
+            byte[] tileData = new byte[256 * 16];
+            Array.Copy(memory, tileDataBlock1Addr, tileData, 0, 128 * 16);
+            Array.Copy(memory, tileDataBlock2Addr, tileData, 128 * 16, 128 * 16);
+            return tileData;
+
+            //int tileDataBlock1Addr = ReadLcdControlRegister().HasFlag(LcdControlFlags.BackgroundAndWindowTileDataArea) ? 0x8000 : 0x9000;
+            //byte[] tileDataBlock1 = new byte[128 * 16];
+            //Array.Copy(memory, tileDataBlock1Addr, tileDataBlock1, 0, tileDataBlock1.Length);
+
+            //int tileDataBlock2Addr = 0x8800;
+            //byte[] tileDataBlock2 = new byte[128 * 16];
+            //Array.Copy(memory, tileDataBlock2Addr, tileDataBlock2, 0, tileDataBlock2.Length);
+            //return (tileDataBlock1, tileDataBlock2);
+        }
+
+        public byte[,] DecodeTileDataToColours(byte[] tileData, byte tileId)
+        {
+            const int tileSize = 8;
+            byte[,] tileColours = new byte[tileSize, tileSize];
+            int addr = tileId * 16;
+
+            for (int row = 0; row < tileSize; row++)
+            {
+                byte lsbData = tileData[addr++];
+                byte msbData = tileData[addr++];
+                for (int col = tileSize - 1; col >= 0; col--)
+                {
+                    tileColours[col, row] = (byte)(((msbData & 1) << 1) | (lsbData & 1));
+                    lsbData >>= 1;
+                    msbData >>= 1;
+                }
+            }
+            return tileColours;
+        }
+
         // TODO: a hack, not to be called from emulated opcodes
         public void UpdateLcdYCoordinate(byte value)
         {
             memory[0xff44] = value;
+        }
+
+        [Flags]
+        private enum LcdControlFlags : byte
+        {
+            LcdPpuEnable = 128, // 0 = Off, 1 = On
+            WindowTileMapArea = 64, // 0=9800-9BFF, 1=9C00-9FFF
+            WindowEnable = 32, // 0 = Off, 1 = On
+            BackgroundAndWindowTileDataArea = 16, // 0=8800-97FF, 1=8000-8FFF
+            BackgroundTileMapArea = 8, // 0=9800-9BFF, 1=9C00-9FFF
+            ObjSize = 4, // 0=8x8, 1=8x16
+            ObjEnable = 2, // 0 = Off, 1 = On
+            BackgroundAndWindowEnablePriority = 1 // 0 = Off, 1 = On
+        }
+
+        private LcdControlFlags ReadLcdControlRegister()
+        {
+            return (LcdControlFlags)memory[0xff40];
         }
 
         private byte ReadMemory(int address)
@@ -101,7 +195,7 @@ namespace GameBoyEmu
             memory[address] = value;
         }
 
-        private void WriteLcdPort(byte port, byte value)
+        private void WriteLcdPort(byte port, byte _ /* value */)
         {
             switch (port)
             {

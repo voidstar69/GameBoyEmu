@@ -262,7 +262,7 @@ namespace GameBoyEmu
                 }
 
                 //Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
-                Console.Write(",{0}:{1:x}", reg.PC, opCode);
+                //Console.Write(",{0}:{1:x}", reg.PC, opCode);
 
                 bool isBottomHalfBlock = ((opCode >> 7) & 1) == 1; // 0 = top half of opcodes, including 8-bit load ops. 1 = bottom half of opcodes, including arithmetic ops
                 bool isQ2orQ4Block = ((opCode >> 6) & 1) == 1; // 0 = Arithmetic ops or top quarter opcodes. 1 = 8-bit load ops or bottom quarter opcodes.
@@ -506,7 +506,7 @@ namespace GameBoyEmu
                 // ADD / ADC (add with carry)
                 case 0:
                     newVal = (byte)(reg.A + operandVal);
-                    if (isRightHalfBlock && (reg.F & Flag.C) != 0)
+                    if (isRightHalfBlock && reg.F.HasFlag(Flag.C))
                         newVal++;
 
                     // set flags register: Z 0 H C
@@ -518,7 +518,7 @@ namespace GameBoyEmu
                 // SUB / SBC (subtract with carry)
                 case 1:
                     newVal = (byte)(reg.A - operandVal);
-                    if (isRightHalfBlock && (reg.F & Flag.C) != 0)
+                    if (isRightHalfBlock && reg.F.HasFlag(Flag.C))
                         newVal--;
 
                     // set flags register: Z 1 H C
@@ -599,6 +599,7 @@ namespace GameBoyEmu
             if (opCodeFamily == 4)
             {
                 reg.PC += 3;
+                // TODO: is this correct, setting only the lowest bit of the flags? Or should it set the correct flag bit?
                 Flag flagBitToBranch = (Flag)(isRightHalfBlock ? 1 : 0);
 
                 switch (opCodeRegIndex)
