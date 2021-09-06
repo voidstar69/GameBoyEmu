@@ -3,6 +3,7 @@ using NUnit.Framework;
 
 namespace EmulatorTests
 {
+    [TestFixture, Timeout(100)]
     public class OpcodeTests
     {
         // Cannot be a byte enum as individual enum values have to be casted to bytes

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace GameBoyEmu
@@ -255,6 +254,12 @@ namespace GameBoyEmu
                     throw new InvalidOperationException($"Opcode ({previousOpCode}) did not increase PC ({reg.PC}). Emulator bug or ROM infinite loop!");
                 previousPC = reg.PC;
                 previousOpCode = opCode;
+
+                // TODO: a hack so that the cart ROM does not have to wait long before it gets to the desired scan-line
+                if (reg.PC == 0x100)
+                {
+                    Memory.UpdateLcdYCoordinate(0x91);
+                }
 
                 //Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
                 Console.Write(",{0}:{1:x}", reg.PC, opCode);
@@ -738,15 +743,15 @@ namespace GameBoyEmu
             {
                 // RES #,r8 - reset bit. Opcodes 0x80 to 0xbf.
                 int bitPosition = opCodeIndex - 16;
-                byte bitMask = (byte) ~(1 << bitPosition);
-                Set8BitRegisterOrMem(reg8Index, (byte) (Get8BitRegisterOrMem(reg8Index) & bitMask));
+                byte bitMask = (byte)~(1 << bitPosition);
+                Set8BitRegisterOrMem(reg8Index, (byte)(Get8BitRegisterOrMem(reg8Index) & bitMask));
             }
             else if (opCodeIndex >= 24)
             {
                 // SET #,r8 - set bit. Opcodes 0xc0 to 0xff.
                 int bitPosition = opCodeIndex - 24;
-                byte bitMask = (byte) (1 << bitPosition);
-                Set8BitRegisterOrMem(reg8Index, (byte) (Get8BitRegisterOrMem(reg8Index) | bitMask));
+                byte bitMask = (byte)(1 << bitPosition);
+                Set8BitRegisterOrMem(reg8Index, (byte)(Get8BitRegisterOrMem(reg8Index) | bitMask));
             }
             else if (expandedOpCode == 0x7C)
             {
@@ -811,7 +816,7 @@ namespace GameBoyEmu
                 default:
                     // TODO: experiment to skip over known but unimplemented opcodes
                     //if (opCode >= MiscOpCodesSize.Length)
-                        throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
+                    throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
                     //Console.Write('*');
                     //break;
             }
