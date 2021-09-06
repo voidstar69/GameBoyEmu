@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace GameBoyEmu
@@ -170,11 +171,9 @@ namespace GameBoyEmu
     public class Emulator
     {
         // Public
-        public static byte DefaultMemoryByteValue { get => InvalidOpCode1; }
-
         public RegisterSet Registers => reg;
 
-        public byte[] Memory => memory;
+        public Memory Memory { get; } = new Memory();
 
         // Private
         private const byte InvalidOpCode1 = 0xDD;
@@ -204,10 +203,6 @@ namespace GameBoyEmu
             0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, // fx
         };
 
-        // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff, and writes to 0xff26 to "setup audio".
-        // TODO: Later on map some high memory accesses directly to VRAM instead of system memory.
-        private readonly byte[] memory = new byte[0x10000];
-
         // registers
         private RegisterSet reg;
 
@@ -225,28 +220,21 @@ namespace GameBoyEmu
 
         public void InjectRom(byte[] bootRomData, byte[] cartRomData)
         {
-            //Array.Clear(memory, 0, memory.Length);
-
-            for (int i = Math.Max(bootRomData.Length, cartRomData.Length); i < memory.Length; i++)
-                memory[i] = DefaultMemoryByteValue;
-
-            Array.Copy(cartRomData, memory, cartRomData.Length);
-            Array.Copy(bootRomData, memory, bootRomData.Length);
-
+            Memory.InjectRom(bootRomData, cartRomData);
             reg.PC = 0;
         }
 
         private byte Get8BitRegisterOrMem(int index)
         {
             // 'register' index 6 is a special case: read memory location indexed by HL register
-            return index == 6 ? memory[reg.HL] : reg.Get8BitRegister(index);
+            return index == 6 ? Memory[reg.HL] : reg.Get8BitRegister(index);
         }
 
         private void Set8BitRegisterOrMem(int index, byte value)
         {
             // 'register' index 6 is a special case: write memory location indexed by HL register
             if (index == 6)
-                memory[reg.HL] = value;
+                Memory[reg.HL] = value;
             else
                 reg.Set8BitRegister(index, value);
         }
@@ -258,9 +246,9 @@ namespace GameBoyEmu
 
             while (numInstructions-- != 0)
             {
-                byte opCode = memory[reg.PC];
-                byte literal8Bit = memory[reg.PC + 1];
-                byte nextNextByte = memory[reg.PC + 2];
+                byte opCode = Memory[reg.PC];
+                byte literal8Bit = Memory[reg.PC + 1];
+                byte nextNextByte = Memory[reg.PC + 2];
                 ushort literal16Bit = (ushort)((nextNextByte << 8) + literal8Bit);
 
                 if (reg.PC == previousPC)
@@ -434,10 +422,10 @@ namespace GameBoyEmu
 
                     if (!isRightHalfBlock)
                         // LD (reg16),A
-                        memory[memoryAddr] = reg.A;
+                        Memory[memoryAddr] = reg.A;
                     else
                         // LD A,(reg16)
-                        reg.A = memory[memoryAddr];
+                        reg.A = Memory[memoryAddr];
 
                     if (opCodeRegIndex == 2)
                         reg.HL++; // carry flag not set if HL overflows
@@ -589,7 +577,7 @@ namespace GameBoyEmu
             // POP rr
             if (opCodeFamily == 1 && !isRightHalfBlock)
             {
-                ushort value = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                ushort value = (ushort)((Memory[reg.SP + 1] << 8) + Memory[reg.SP]);
                 reg.SP += 2;
 
                 // 4th row is AF instead of SP
@@ -627,8 +615,8 @@ namespace GameBoyEmu
 
                 // push next opcode in sequence onto stack, and branch to 16-bit address
                 reg.SP -= 2;
-                memory[reg.SP] = (byte)reg.PC;
-                memory[reg.SP + 1] = (byte)(reg.PC >> 8);
+                Memory[reg.SP] = (byte)reg.PC;
+                Memory[reg.SP + 1] = (byte)(reg.PC >> 8);
                 reg.PC = literal16Bit;
                 return true;
             }
@@ -638,8 +626,8 @@ namespace GameBoyEmu
             {
                 ushort value = opCodeRegIndex == 3 ? reg.AF : reg.Get16BitRegister(opCodeRegIndex); // 4th row is AF instead of SP
                 reg.SP -= 2;
-                memory[reg.SP] = (byte)value;
-                memory[reg.SP + 1] = (byte)(value >> 8);
+                Memory[reg.SP] = (byte)value;
+                Memory[reg.SP + 1] = (byte)(value >> 8);
                 reg.PC++;
                 return true;
             }
@@ -648,44 +636,44 @@ namespace GameBoyEmu
             {
                 // LDH (a8),A  aka  LD ($FF00+a8),A
                 case (byte)OpCode.LDH_a8_A:
-                    memory[0xFF00 + literal8Bit] = reg.A;
+                    Memory[0xFF00 + literal8Bit] = reg.A;
                     reg.PC += 2;
                     return true;
 
                 // LDH A,(a8)  aka  LD A,($FF00+a8)
                 case (byte)OpCode.LDH_A_a8:
-                    reg.A = memory[0xFF00 + literal8Bit];
+                    reg.A = Memory[0xFF00 + literal8Bit];
                     reg.PC += 2;
                     return true;
 
                 // LD (a16),A
                 case (byte)OpCode.LD_a16_A:
-                    memory[literal16Bit] = reg.A;
+                    Memory[literal16Bit] = reg.A;
                     reg.PC += 3;
                     return true;
 
                 // LD (C),A  aka  LD ($FF00+C),A
                 case (byte)OpCode.LD_Cmem_A:
-                    memory[0xFF00 + reg.C] = reg.A;
+                    Memory[0xFF00 + reg.C] = reg.A;
                     reg.PC += 2;
                     return true;
 
                 case (byte)OpCode.CALL_a16:
                     reg.PC += 3;
                     reg.SP -= 2;
-                    memory[reg.SP] = (byte)reg.PC;
-                    memory[reg.SP + 1] = (byte)(reg.PC >> 8);
+                    Memory[reg.SP] = (byte)reg.PC;
+                    Memory[reg.SP + 1] = (byte)(reg.PC >> 8);
                     reg.PC = literal16Bit;
                     return true;
 
                 case (byte)OpCode.RET:
-                    reg.PC = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                    reg.PC = (ushort)((Memory[reg.SP + 1] << 8) + Memory[reg.SP]);
                     reg.SP += 2;
                     return true;
 
                 // RETurn and enable interrupts
                 case (byte)OpCode.RETI:
-                    reg.PC = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                    reg.PC = (ushort)((Memory[reg.SP + 1] << 8) + Memory[reg.SP]);
                     reg.SP += 2;
                     reg.IME = true;
                     return true;

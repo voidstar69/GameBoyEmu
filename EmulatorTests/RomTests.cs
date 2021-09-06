@@ -42,7 +42,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             emulator.Run(4);
 
@@ -69,7 +69,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             emulator.Run(5);
@@ -98,7 +98,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             emulator.Run(7);
@@ -126,7 +126,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
@@ -158,7 +158,7 @@ namespace EmulatorTests
         {
             var romData = File.ReadAllBytes("DMG_ROM.bin");
             emulator.InjectRom(romData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
@@ -184,7 +184,7 @@ namespace EmulatorTests
             var bootRomData = File.ReadAllBytes("DMG_ROM.bin");
             var cartRomData = File.ReadAllBytes("2048.gb.bin");
             emulator.InjectRom(bootRomData, cartRomData);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xdd, memory[0x9fff]);
             Assert.AreEqual(0xdd, memory[0x9ffe]);
             Assert.AreEqual(0xdd, memory[0x8000]);
@@ -192,7 +192,7 @@ namespace EmulatorTests
 
             memory[0xff44] = 0x90; // value expected when Boot ROM is waiting for screen frame
 
-            emulator.Run(47443 + 10000); // TODO: opcode 195 / 0xc3 (C3 'JP a16') not implemented at PC=257 / 0x101
+            emulator.Run(47443 + 100000); // TODO: cart ROM is stuck in a loop waiting for LCD IO memory to change
 
             RegisterSet register = emulator.Registers;
             Assert.AreEqual(779, register.PC);

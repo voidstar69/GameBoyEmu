@@ -86,7 +86,7 @@ namespace EmulatorTests
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0, register.HL);
             Assert.AreEqual(Flag.None, register.F);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0x35, memory[0]);
             Assert.AreEqual(0, register.A);
             Assert.AreEqual(0, register.BC);
@@ -206,7 +206,7 @@ namespace EmulatorTests
             Assert.AreEqual(3, register.PC);
             Assert.AreEqual(0xbc, register.A);
             Assert.AreEqual(0, register.HL);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xbc, memory[0]);
             Assert.AreEqual(0xbc, memory[1]);
             Assert.AreEqual(0x77, memory[2]);
@@ -225,7 +225,7 @@ namespace EmulatorTests
             Assert.AreEqual(0xabcd, register.BC);
             Assert.AreEqual(0xcd, register.C);
             Assert.AreEqual(0, register.HL);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0xcd, memory[0]);
             Assert.AreEqual(0xcd, memory[1]);
             Assert.AreEqual(0xab, memory[2]);
@@ -244,7 +244,7 @@ namespace EmulatorTests
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0x7e, register.A);
             Assert.AreEqual(0, register.HL);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0x7e, memory[0]);
             Assert.AreEqual(0, register.BC);
             Assert.AreEqual(0, register.DE);
@@ -264,12 +264,12 @@ namespace EmulatorTests
             Assert.AreEqual(0, register.DE);
             Assert.AreEqual(0, register.HL);
             Assert.AreEqual(0, register.SP);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(Op.LD_BC_d16, memory[0]);
-            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[4]);
-            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[memAddr - 1]);
+            Assert.AreEqual(Memory.DefaultMemoryByteValue, memory[4]);
+            Assert.AreEqual(Memory.DefaultMemoryByteValue, memory[memAddr - 1]);
             Assert.AreEqual(0, memory[memAddr]);
-            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[memAddr + 1]);
+            Assert.AreEqual(Memory.DefaultMemoryByteValue, memory[memAddr + 1]);
         }
 
         [Test]
@@ -281,9 +281,9 @@ namespace EmulatorTests
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0, register.A);
             Assert.AreEqual(0xffff, register.HL); // underflows from 0 to reach (2^16)-1
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0]);
-            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[1]);
+            Assert.AreEqual(Memory.DefaultMemoryByteValue, memory[1]);
             Assert.AreEqual(0, register.BC);
             Assert.AreEqual(0, register.DE);
             Assert.AreEqual(0, register.SP);
@@ -298,9 +298,9 @@ namespace EmulatorTests
             Assert.AreEqual(1, register.PC);
             Assert.AreEqual(0, register.A);
             Assert.AreEqual(0x1, register.HL);
-            byte[] memory = emulator.Memory;
+            Memory memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0]);
-            Assert.AreEqual(Emulator.DefaultMemoryByteValue, memory[1]);
+            Assert.AreEqual(Memory.DefaultMemoryByteValue, memory[1]);
             Assert.AreEqual(0, register.BC);
             Assert.AreEqual(0, register.DE);
             Assert.AreEqual(0, register.SP);
