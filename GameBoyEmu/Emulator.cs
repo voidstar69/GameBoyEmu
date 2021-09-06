@@ -20,8 +20,10 @@ namespace GameBoyEmu
         LD_HLmem_A = 0x77,  // LD (HL),A
         LD_A_HLmem = 0x7e,  // LD A,(HL)
         XOR_A = 0xaf,
+        JP_a16 = 0xc3,
         PUSH_BC = 0xc5,
         RET = 0xc9,         // return from a CALL
+        RETI = 0xd9,        // return from a CALL and enable interrupts
         PREFIX_CB = 0xcb,   // prefix for expanded set of another 256 bit-wise instructions
         CALL_a16 = 0xcd,
         LDH_a8_A = 0xe0,    // LDH (a8),A  aka  LD ($FF00+a8),A
@@ -55,6 +57,13 @@ namespace GameBoyEmu
 
         public ushort SP; // stack pointer
         public ushort PC; // program counter
+
+        public ushort IE; // interrupt enable (r/w). TODO: should be at memory address 0xffff
+        public ushort IF; // interrupt flag (r/w). TODO: should be at memory address 0xff0f
+
+        public bool IME; // interrupt master enable flag (TODO: write only). 1/true=enable all interrupts enabled in the IE register
+
+        // TODO: implement handling of interrupts
 
         public ushort AF
         {
@@ -197,7 +206,7 @@ namespace GameBoyEmu
 
         // TODO: ensure mapped memory is large enough for boot ROM, which writes to VRAM at 0x9fff, and writes to 0xff26 to "setup audio".
         // TODO: Later on map some high memory accesses directly to VRAM instead of system memory.
-        private readonly byte[] memory = new byte[0xffff];
+        private readonly byte[] memory = new byte[0x10000];
 
         // registers
         private RegisterSet reg;
@@ -673,6 +682,13 @@ namespace GameBoyEmu
                     reg.SP += 2;
                     return true;
 
+                // RETurn and enable interrupts
+                case (byte)OpCode.RETI:
+                    reg.PC = (ushort)((memory[reg.SP + 1] << 8) + memory[reg.SP]);
+                    reg.SP += 2;
+                    reg.IME = true;
+                    return true;
+
                 case (byte)OpCode.CP_d8:
                     byte newVal = (byte)(reg.A - literal8Bit);
 
@@ -680,6 +696,23 @@ namespace GameBoyEmu
                     reg.SetFlags(zero: newVal == 0, subtract: true, halfCarry: (newVal & 0x0f) > (reg.A & 0x0f), carry: newVal > reg.A);
 
                     reg.PC += 2;
+                    return true;
+
+                // JP a16
+                case (byte)OpCode.JP_a16:
+                    reg.PC = literal16Bit;
+                    return true;
+
+                // DI - disable interrupt
+                case 0xf3:
+                    reg.IME = false;
+                    reg.PC += 1;
+                    return true;
+
+                // EI - enable interrupt
+                case 0xfb:
+                    reg.IME = true;
+                    reg.PC += 1;
                     return true;
 
                 default:
@@ -778,10 +811,10 @@ namespace GameBoyEmu
 
                 default:
                     // TODO: experiment to skip over known but unimplemented opcodes
-                    if (opCode >= MiscOpCodesSize.Length)
+                    //if (opCode >= MiscOpCodesSize.Length)
                         throw new ArgumentOutOfRangeException(nameof(opCode), opCode, "Invalid opcode at PC=" + reg.PC);
-                    Console.Write('*');
-                    break;
+                    //Console.Write('*');
+                    //break;
             }
 
             reg.PC += MiscOpCodesSize[opCode];
