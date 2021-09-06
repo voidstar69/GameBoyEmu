@@ -185,23 +185,23 @@ namespace EmulatorTests
             var cartRomData = File.ReadAllBytes("2048.gb.bin");
             emulator.InjectRom(bootRomData, cartRomData);
             byte[] memory = emulator.Memory;
-            //Assert.AreEqual(0xdd, memory[0x9fff]);
-            //Assert.AreEqual(0xdd, memory[0x9ffe]);
-            //Assert.AreEqual(0xdd, memory[0x8000]);
-            //Assert.AreEqual(0xdd, memory[0x7fff]);
+            Assert.AreEqual(0xdd, memory[0x9fff]);
+            Assert.AreEqual(0xdd, memory[0x9ffe]);
+            Assert.AreEqual(0xdd, memory[0x8000]);
+            Assert.AreEqual(0x0, memory[0x7fff]);
 
             memory[0xff44] = 0x90; // value expected when Boot ROM is waiting for screen frame
 
-            emulator.Run(47443 + 1000); // TODO: opcode 195 / 0xc3 (C3 'JP a16') not implemented at PC=257 / 0x101
+            emulator.Run(47443 + 10000); // TODO: opcode 195 / 0xc3 (C3 'JP a16') not implemented at PC=257 / 0x101
 
             RegisterSet register = emulator.Registers;
-            Assert.AreEqual(0xec, register.PC);
+            Assert.AreEqual(779, register.PC);
 
             memory = emulator.Memory;
             Assert.AreEqual(0x0, memory[0x9fff]);
             Assert.AreEqual(0x0, memory[0x9ffe]);
             Assert.AreEqual(0x0, memory[0x8000]);
-            Assert.AreEqual(0xdd, memory[0x7fff]);
+            Assert.AreEqual(0x0, memory[0x7fff]);
         }
     }
 }

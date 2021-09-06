@@ -238,6 +238,7 @@ namespace GameBoyEmu
 
         public void Run(int numInstructions = -1)
         {
+            byte previousOpCode = 0;
             ushort previousPC = 1000;
 
             while (numInstructions-- != 0)
@@ -246,6 +247,11 @@ namespace GameBoyEmu
                 byte literal8Bit = memory[reg.PC + 1];
                 byte nextNextByte = memory[reg.PC + 2];
                 ushort literal16Bit = (ushort)((nextNextByte << 8) + literal8Bit);
+
+                if (reg.PC == previousPC)
+                    throw new InvalidOperationException($"Opcode ({previousOpCode}) did not increase PC ({reg.PC}). Emulator bug or ROM infinite loop!");
+                previousPC = reg.PC;
+                previousOpCode = opCode;
 
                 //Console.WriteLine("Opcode=0x{0:x}, Literal8bit=0x{1:x}, Literal16bit=0x{2:x}", opCode, literal8Bit, literal16Bit);
                 Console.Write(",{0}:{1:x}", reg.PC, opCode);
@@ -314,10 +320,6 @@ namespace GameBoyEmu
                 }
 
                 ExecuteOpcode_Misc(opCode, literal8Bit);
-
-                if (reg.PC == previousPC)
-                    throw new InvalidOperationException($"Opcode ({opCode}) did not increase PC ({reg.PC}). Emulator bug or ROM infinite loop!");
-                previousPC = reg.PC;
             }
         }
 
@@ -749,7 +751,41 @@ namespace GameBoyEmu
         {
             reg.PC += 2;
 
-            if (expandedOpCode == 0x7C)
+            int reg8Index = expandedOpCode & 0x07; // 0..7 == B,C,D,E,H,L,(HL),A
+            int opCodeIndex = expandedOpCode >> 3; // 0..31, index of half-row in expanded opcode table
+
+            if (opCodeIndex >= 16 && opCodeIndex <= 23)
+            {
+                // RES #,r8 - reset bit. Opcodes 0x80 to 0xbf.
+                int bitPosition = opCodeIndex - 16;
+                byte bitMask = (byte) ~(1 << bitPosition);
+
+                // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                value &= bitMask;
+
+                if (reg8Index == 6)
+                    memory[reg.HL] = value;
+                else
+                    reg.Set8BitRegister(reg8Index, value);
+
+            }
+            else if (opCodeIndex >= 24)
+            {
+                // SET #,r8 - set bit. Opcodes 0xc0 to 0xff.
+                int bitPosition = opCodeIndex - 24;
+                byte bitMask = (byte) (1 << bitPosition);
+
+                // 'register' index 6 is a special case: read/write memory location indexed by HL register
+                byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                value |= bitMask;
+
+                if (reg8Index == 6)
+                    memory[reg.HL] = value;
+                else
+                    reg.Set8BitRegister(reg8Index, value);
+            }
+            else if (expandedOpCode == 0x7C)
             {
                 // BIT 7,H
                 const int bitPosition = 7;
