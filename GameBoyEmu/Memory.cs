@@ -104,6 +104,36 @@ namespace GameBoyEmu
             return tileColours;
         }
 
+        // Returns a 2D array of 4-bit-per-pixel colour
+        // TODO: palette not used yet
+        // TODO: probably very slow
+        public byte[,] RenderBackground()
+        {
+            const int backgroundSize = 256;
+            byte[,] background = new byte[backgroundSize, backgroundSize];
+            byte[] tileData = GetBackgroundAndWindowTileData();
+            byte[,] tileMap = GetTileMap2D();
+
+            for (int row = 0; row < tileMap.GetLength(0); row++)
+            {
+                for (int col = 0; col < tileMap.GetLength(1); col++)
+                {
+                    byte tileId = tileMap[col, row];
+                    byte[,] tileColours = DecodeTileDataToColours(tileData, tileId);
+
+                    for (int y = 0; y < tileColours.GetLength(0); y++)
+                    {
+                        for (int x = 0; x < tileColours.GetLength(1); x++)
+                        {
+                            byte colour = tileColours[x, y];
+                            background[col * 8 + x, row * 8 + y] = colour;
+                        }
+                    }
+                }
+            }
+            return background;
+        }
+
         // TODO: a hack, not to be called from emulated opcodes
         public void UpdateLcdYCoordinate(byte value)
         {

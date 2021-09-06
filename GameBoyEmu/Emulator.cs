@@ -599,19 +599,17 @@ namespace GameBoyEmu
             if (opCodeFamily == 4)
             {
                 reg.PC += 3;
-                // TODO: is this correct, setting only the lowest bit of the flags? Or should it set the correct flag bit?
-                bool flagMustBeSetToBranch = isRightHalfBlock ? true : false;
 
                 switch (opCodeRegIndex)
                 {
                     // CALL NZ,a16 / CALL Z,a16
                     case 0:
-                        if (reg.F.HasFlag(Flag.Z) != flagMustBeSetToBranch) return true; // no branch, move to next opcode
+                        if (reg.F.HasFlag(Flag.Z) != isRightHalfBlock) return true; // no branch, move to next opcode
                         break;
 
                     // CALL NC,a16 / CALL C,a16
                     case 1:
-                        if (reg.F.HasFlag(Flag.C) != flagMustBeSetToBranch) return true; // no branch, move to next opcode
+                        if (reg.F.HasFlag(Flag.C) != isRightHalfBlock) return true; // no branch, move to next opcode
                         break;
 
                     // Invalid opcodes - the real machine crashes here!

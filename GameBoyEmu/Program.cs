@@ -44,25 +44,33 @@ namespace GameBoyEmu
             byte[,] tileMap = emulator.Memory.GetTileMap2D();
             Print2DArrayToConsole(tileMap);
 
+            // TODO: all tiles #1 to #24 seem to have been decoded by the boot ROM as identical vertical stripes!
+            // Only tile #25 appears to have been correctly decoded (the boot ROM decodes it separately).
             Console.WriteLine();
             Console.WriteLine("Tile #1 decoded colours (8 x 8):");
             byte[,] tileColours = emulator.Memory.DecodeTileDataToColours(tileData, tileId: 1);
-            Print2DArrayToConsole(tileColours);
+            Print2DArrayToConsole(tileColours, false);
 
             Console.WriteLine();
             Console.WriteLine("Tile #25 decoded colours (8 x 8):");
             tileColours = emulator.Memory.DecodeTileDataToColours(tileData, tileId: 25);
-            Print2DArrayToConsole(tileColours);
+            Print2DArrayToConsole(tileColours, false);
+
+            Console.WriteLine();
+            Console.WriteLine("Entire background (256 x 256):");
+            byte[,] background = emulator.Memory.RenderBackground();
+            Print2DArrayToConsole(background, false);
         }
 
-        private static void Print2DArrayToConsole(byte[,] data)
+        private static void Print2DArrayToConsole(byte[,] data, bool separate = true)
         {
             for (int row = 0; row < data.GetLength(0); row++)
             {
                 for (int col = 0; col < data.GetLength(1); col++)
                 {
                     Console.Write(data[col, row]);
-                    Console.Write(',');
+                    if(separate)
+                        Console.Write(',');
                 }
                 Console.WriteLine();
             }
