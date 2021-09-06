@@ -236,6 +236,21 @@ namespace GameBoyEmu
             reg.PC = 0;
         }
 
+        private byte Get8BitRegisterOrMem(int index)
+        {
+            // 'register' index 6 is a special case: read memory location indexed by HL register
+            return index == 6 ? memory[reg.HL] : reg.Get8BitRegister(index);
+        }
+
+        private void Set8BitRegisterOrMem(int index, byte value)
+        {
+            // 'register' index 6 is a special case: write memory location indexed by HL register
+            if (index == 6)
+                memory[reg.HL] = value;
+            else
+                reg.Set8BitRegister(index, value);
+        }
+
         public void Run(int numInstructions = -1)
         {
             byte previousOpCode = 0;
@@ -451,14 +466,9 @@ namespace GameBoyEmu
 
                 // INC reg8 or INC (HL)
                 case 4:
-                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                    byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                    byte value = Get8BitRegisterOrMem(reg8Index);
                     value++;
-
-                    if (reg8Index == 6)
-                        memory[reg.HL] = value;
-                    else
-                        reg.Set8BitRegister(reg8Index, value);
+                    Set8BitRegisterOrMem(reg8Index, value);
 
                     // set flags register: Z 0 H -
                     reg.SetFlags(zero: value == 0, subtract: false, halfCarry: (value & 0x0f) == 0, carry: (reg.F & Flag.C) != 0);
@@ -467,14 +477,9 @@ namespace GameBoyEmu
 
                 // DEC reg8 or DEC (HL)
                 case 5:
-                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                    value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
+                    value = Get8BitRegisterOrMem(reg8Index);
                     value--;
-
-                    if (reg8Index == 6)
-                        memory[reg.HL] = value;
-                    else
-                        reg.Set8BitRegister(reg8Index, value);
+                    Set8BitRegisterOrMem(reg8Index, value);
 
                     // set flags register: Z 1 H -
                     reg.SetFlags(zero: value == 0, subtract: true, halfCarry: (value & 0x0f) == 0x0f, carry: (reg.F & Flag.C) != 0);
@@ -483,12 +488,7 @@ namespace GameBoyEmu
 
                 // LD r,d8 or LD (HL),d8
                 case 6:
-                    // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                    if (reg8Index == 6)
-                        memory[reg.HL] = literal8Bit;
-                    else
-                        reg.Set8BitRegister(reg8Index, literal8Bit);
-
+                    Set8BitRegisterOrMem(reg8Index, literal8Bit);
                     reg.PC += 2;
                     return true;
 
@@ -505,8 +505,7 @@ namespace GameBoyEmu
             Debug.Assert(0 <= srcReg8Index && srcReg8Index <= 7);
             Debug.Assert(0 <= opCodeRowIndex && opCodeRowIndex <= 3);
 
-            // 'register' index 6 is a special case: read/write memory location indexed by HL register
-            byte operandVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
+            byte operandVal = Get8BitRegisterOrMem(srcReg8Index);
 
             byte newVal;
             switch (opCodeRowIndex)
@@ -735,14 +734,7 @@ namespace GameBoyEmu
             if (opCode == (byte)OpCode.HALT)
                 throw new NotImplementedException("HALT");
 
-            // 'register' index 6 is a special case: read/write memory location indexed by HL register
-            byte regOrMemVal = srcReg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(srcReg8Index);
-
-            if (destReg8Index == 6)
-                memory[reg.HL] = regOrMemVal;
-            else
-                reg.Set8BitRegister(destReg8Index, regOrMemVal);
-
+            Set8BitRegisterOrMem(destReg8Index, Get8BitRegisterOrMem(srcReg8Index));
             reg.PC++;
         }
 
@@ -759,31 +751,14 @@ namespace GameBoyEmu
                 // RES #,r8 - reset bit. Opcodes 0x80 to 0xbf.
                 int bitPosition = opCodeIndex - 16;
                 byte bitMask = (byte) ~(1 << bitPosition);
-
-                // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
-                value &= bitMask;
-
-                if (reg8Index == 6)
-                    memory[reg.HL] = value;
-                else
-                    reg.Set8BitRegister(reg8Index, value);
-
+                Set8BitRegisterOrMem(reg8Index, (byte) (Get8BitRegisterOrMem(reg8Index) & bitMask));
             }
             else if (opCodeIndex >= 24)
             {
                 // SET #,r8 - set bit. Opcodes 0xc0 to 0xff.
                 int bitPosition = opCodeIndex - 24;
                 byte bitMask = (byte) (1 << bitPosition);
-
-                // 'register' index 6 is a special case: read/write memory location indexed by HL register
-                byte value = reg8Index == 6 ? memory[reg.HL] : reg.Get8BitRegister(reg8Index);
-                value |= bitMask;
-
-                if (reg8Index == 6)
-                    memory[reg.HL] = value;
-                else
-                    reg.Set8BitRegister(reg8Index, value);
+                Set8BitRegisterOrMem(reg8Index, (byte) (Get8BitRegisterOrMem(reg8Index) | bitMask));
             }
             else if (expandedOpCode == 0x7C)
             {
