@@ -778,7 +778,7 @@ namespace GameBoyEmu
                 // RL C - rotate left through carry
                 // TODO: guessing how to use carry flag to add a bit to register
                 byte oldVal = reg.C;
-                reg.C = (byte)((oldVal << 1) | ((reg.F & Flag.C) != 0 ? 1 : 0));
+                reg.C = (byte)((oldVal << 1) | (reg.F.HasFlag(Flag.C) ? 1 : 0));
 
                 // set flags register: Z 0 0 C
                 // TODO: guessing how to set carry flag
@@ -802,7 +802,7 @@ namespace GameBoyEmu
                     // RLA - rotate A left through carry
                     // TODO: guessing how to use carry flag to add a bit to register
                     byte oldVal = reg.A;
-                    reg.A = (byte)((oldVal << 1) | ((reg.F & Flag.C) != 0 ? 1 : 0));
+                    reg.A = (byte)((oldVal << 1) | (reg.F.HasFlag(Flag.C) ? 1 : 0));
 
                     // set flags register: 0 0 0 C
                     // TODO: guessing how to set carry flag
@@ -819,7 +819,7 @@ namespace GameBoyEmu
                     //Console.Write('*');
                     //break;
             }
-
+             
             reg.PC += MiscOpCodesSize[opCode];
         }
     }

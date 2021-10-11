@@ -1,5 +1,6 @@
 ﻿using GameBoyEmu;
 using NUnit.Framework;
+using System;
 using System.IO;
 
 namespace EmulatorTests
@@ -153,7 +154,7 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
         }
-        
+
         [Test, Timeout(200)]
         public void RunBootRom_UntilLogoCheck()
         {
@@ -179,11 +180,28 @@ namespace EmulatorTests
             Assert.AreEqual(0x0, memory[0x8000]);
             Assert.AreEqual(0xdd, memory[0x7fff]);
 
-            //memoryData = memory.GetMemoryClone();
-            //File.WriteAllBytes("memory2.bin", memoryData);
-
+            ////File.WriteAllBytes("memory2.bin", memoryData);
             //var tileMap = memory.GetTileMap1D();
             //File.WriteAllBytes("tilemap.bin", tileMap);
+
+            byte[] allTilesData = emulator.Memory.GetBackgroundAndWindowTileData();
+            byte[] singleTile = new byte[16];
+
+            // TODO: all tiles #1 to #24 seem to have been decoded by the boot ROM as identical vertical stripes!
+            // Only tile #25 appears to have been correctly decoded (the boot ROM decodes it separately).
+            Array.Copy(allTilesData, singleTile, 16); // tile #0
+            Assert.AreEqual(new byte[] { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }, singleTile);
+
+            Array.Copy(allTilesData, 25 * 16, singleTile, 0, 16); // tile #25
+            Assert.AreEqual(new byte[] { 60, 0, 66, 0, 185, 0, 165, 0, 185, 0, 165, 0, 66, 0, 60, 0 }, singleTile);
+
+            Array.Copy(allTilesData, 1 * 16, singleTile, 0, 16); // tile #1
+            Assert.AreEqual(new byte[] { 243, 0, 243, 0, 243, 0, 243, 0, 243, 0, 243, 0, 243, 0, 243, 0 }, singleTile);
+
+            // check for regressions in final memory contents after the Boot ROM finished executing (until the Logo check)
+            var expectedMemory = File.ReadAllBytes("BootRomFinalMemoryContents.bin");
+            var memoryData = memory.GetMemoryClone();
+            Assert.AreEqual(expectedMemory, memoryData);
         }
 
         [Test, Timeout(200)]
